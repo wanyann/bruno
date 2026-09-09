@@ -125,6 +125,15 @@ const StyledWrapper = styled.div`
     color: ${(props) => props.theme.colors.text.muted};
     text-transform: uppercase;
     letter-spacing: 0.03em;
+    width: 100%;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      color: ${(props) => props.theme.primary.text || props.theme.text};
+    }
   }
 
   .vp-empty {

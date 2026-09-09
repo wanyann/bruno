@@ -11,8 +11,11 @@ import {
   getVariablesUsedInRequest,
   getAllVariablesByScope
 } from 'utils/collections';
-import { updateVariableInScope, addToVariableScope } from 'providers/ReduxStore/slices/collections/actions';
+import { updateVariableInScope, addToVariableScope, openCollectionSettings } from 'providers/ReduxStore/slices/collections/actions';
+import { addTab } from 'providers/ReduxStore/slices/tabs';
 import { setVariablesPanelOpen } from 'providers/ReduxStore/slices/app';
+import CollectionCreateEnvironment from 'components/Environments/EnvironmentSettings/CreateEnvironment';
+import GlobalCreateEnvironment from 'components/WorkspaceHome/WorkspaceEnvironments/CreateEnvironment';
 import VariableRow from './VariableRow';
 import ScopeBadge from './ScopeBadge';
 import StyledWrapper from './StyledWrapper';
@@ -32,13 +35,19 @@ const loadPersistedWidth = () => {
   return DEFAULT_PANEL_WIDTH;
 };
 
-const VariableGroup = ({ title, scope, variables, collection, item, onSave }) => {
+const VariableGroup = ({ title, scope, variables, collection, item, onSave, onTitleClick }) => {
   return (
     <>
-      <div className="vp-group-title">
+      <button
+        type="button"
+        className="vp-group-title"
+        onClick={onTitleClick}
+        data-testid={`vp-group-${scope}`}
+        title={`Edit ${title}`}
+      >
         <ScopeBadge type={scope} />
         <span className="vp-group-title-text">{title}</span>
-      </div>
+      </button>
       {variables.length === 0 ? (
         <div className="vp-empty">No variables defined</div>
       ) : (
@@ -185,6 +194,36 @@ const VariablesPanel = () => {
     dispatch(addToVariableScope(name, scope, activeCollection.uid)).catch(() => {});
   }, [activeCollection, dispatch]);
 
+  const [showCreateEnv, setShowCreateEnv] = useState(false);
+  const [showCreateGlobal, setShowCreateGlobal] = useState(false);
+
+  const handleGroupTitleClick = useCallback((scope) => {
+    if (!activeCollection) return;
+    if (scope === 'environment') {
+      if (activeEnvName) {
+        dispatch(addTab({
+          uid: `${activeCollection.uid}-environment-settings`,
+          collectionUid: activeCollection.uid,
+          type: 'environment-settings'
+        }));
+      } else {
+        setShowCreateEnv(true);
+      }
+    } else if (scope === 'global') {
+      if (activeGlobalEnvName) {
+        dispatch(addTab({
+          uid: `${activeCollection.uid}-global-environment-settings`,
+          collectionUid: activeCollection.uid,
+          type: 'global-environment-settings'
+        }));
+      } else {
+        setShowCreateGlobal(true);
+      }
+    } else if (scope === 'collection') {
+      dispatch(openCollectionSettings(activeCollection.uid, 'vars'));
+    }
+  }, [activeCollection, activeEnvName, activeGlobalEnvName, dispatch]);
+
   const closePanel = useCallback(() => {
     dispatch(setVariablesPanelOpen(false));
   }, [dispatch]);
@@ -276,6 +315,7 @@ const VariablesPanel = () => {
               variables={allByScope.environment}
               collection={activeCollection}
               item={item}
+              onTitleClick={() => handleGroupTitleClick('environment')}
               onSave={(name, si, nv) => handleSave(name, si, nv)}
             />
             {showCollectionGroup && (
@@ -286,6 +326,7 @@ const VariablesPanel = () => {
                 variables={allByScope.collection}
                 collection={activeCollection}
                 item={item}
+                onTitleClick={() => handleGroupTitleClick('collection')}
                 onSave={(name, si, nv) => handleSave(name, si, nv)}
               />
             )}
@@ -296,11 +337,25 @@ const VariablesPanel = () => {
               variables={allByScope.global}
               collection={activeCollection}
               item={item}
+              onTitleClick={() => handleGroupTitleClick('global')}
               onSave={(name, si, nv) => handleSave(name, si, nv)}
             />
           </PanelSection>
         </div>
       </div>
+      {showCreateEnv && (
+        <CollectionCreateEnvironment
+          collection={activeCollection}
+          onClose={() => setShowCreateEnv(false)}
+          onEnvironmentCreated={() => setShowCreateEnv(false)}
+        />
+      )}
+      {showCreateGlobal && (
+        <GlobalCreateEnvironment
+          onClose={() => setShowCreateGlobal(false)}
+          onEnvironmentCreated={() => setShowCreateGlobal(false)}
+        />
+      )}
     </StyledWrapper>
   );
 };
