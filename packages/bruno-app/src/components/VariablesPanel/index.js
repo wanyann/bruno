@@ -11,7 +11,7 @@ import {
   getVariablesUsedInRequest,
   getAllVariablesByScope
 } from 'utils/collections';
-import { updateVariableInScope } from 'providers/ReduxStore/slices/collections/actions';
+import { updateVariableInScope, addToVariableScope } from 'providers/ReduxStore/slices/collections/actions';
 import { setVariablesPanelOpen } from 'providers/ReduxStore/slices/app';
 import VariableRow from './VariableRow';
 import ScopeBadge from './ScopeBadge';
@@ -122,6 +122,19 @@ const VariablesPanel = () => {
 
   const activeCollection = find(collection, (c) => c.uid === focusedTab?.collectionUid) || null;
 
+  const activeEnvName = useMemo(() => {
+    if (!activeCollection || !activeCollection.environments) return null;
+    const uid = activeCollection.realActiveEnvironmentUid ?? activeCollection.activeEnvironmentUid;
+    const env = find(activeCollection.environments, (e) => e.uid === uid);
+    return env?.name || null;
+  }, [activeCollection]);
+
+  const activeGlobalEnvName = useMemo(() => {
+    if (!globalEnvironments) return null;
+    const env = find(globalEnvironments, (e) => e.uid === activeGlobalEnvironmentUid);
+    return env?.name || null;
+  }, [globalEnvironments, activeGlobalEnvironmentUid]);
+
   // Resolve the active item (request) for "variables used in request"
   let item = null;
   if (activeCollection && focusedTab?.uid) {
@@ -142,9 +155,34 @@ const VariablesPanel = () => {
     [activeCollection, item]
   );
 
+  const addToOptions = useMemo(() => {
+    return [
+      {
+        scope: 'environment',
+        label: `Collection Environment${activeEnvName ? ` (${activeEnvName})` : ''}`,
+        disabled: !activeEnvName
+      },
+      {
+        scope: 'global',
+        label: `Global Environment${activeGlobalEnvName ? ` (${activeGlobalEnvName})` : ''}`,
+        disabled: !activeGlobalEnvName
+      },
+      {
+        scope: 'collection',
+        label: 'Collection Variable',
+        disabled: false
+      }
+    ];
+  }, [activeEnvName, activeGlobalEnvName]);
+
   const handleSave = useCallback((name, scopeInfo, newValue) => {
     if (!activeCollection || !scopeInfo) return;
     dispatch(updateVariableInScope(name, newValue, scopeInfo, activeCollection.uid)).catch(() => {});
+  }, [activeCollection, dispatch]);
+
+  const handleAddToScope = useCallback((name, scope) => {
+    if (!activeCollection) return;
+    dispatch(addToVariableScope(name, scope, activeCollection.uid)).catch(() => {});
   }, [activeCollection, dispatch]);
 
   const closePanel = useCallback(() => {
@@ -216,6 +254,9 @@ const VariablesPanel = () => {
                       collection={activeCollection}
                       item={item}
                       onSave={(nv) => handleSave(v.name, v.scopeInfo, nv)}
+                      addToEnabled
+                      addToOptions={addToOptions}
+                      onAddToScope={handleAddToScope}
                     />
                   ))}
                 </div>

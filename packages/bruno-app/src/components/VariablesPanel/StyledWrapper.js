@@ -182,6 +182,116 @@ const StyledWrapper = styled.div`
       min-width: 0;
       padding: 4px 8px;
       box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+
+      .vp-value-inner {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+
+        .vp-value-placeholder {
+          position: absolute;
+          left: 8px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: ${(props) => props.theme.colors.text.muted};
+          opacity: 0.6;
+          font-size: 12px;
+          pointer-events: none;
+          white-space: nowrap;
+        }
+      }
+    }
+
+    .vp-add-wrap {
+      position: relative;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .vp-add-btn {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      border: none;
+      background: transparent;
+      border-radius: 4px;
+      color: ${(props) => props.theme.colors.text.muted};
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+
+      &:hover {
+        background: ${(props) => props.theme.colors.text.muted}22;
+        color: ${(props) => props.theme.primary.text};
+      }
+    }
+
+    .vp-add-menu {
+      position: absolute;
+      right: 0;
+      min-width: 190px;
+      padding: 4px;
+      background: ${(props) => props.theme.sidebar.bg || props.theme.bg};
+      border: 1px solid ${(props) => props.theme.border.border1};
+      border-radius: 6px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+
+      &.vp-add-menu-down {
+        top: calc(100% + 4px);
+      }
+
+      &.vp-add-menu-up {
+        bottom: calc(100% + 4px);
+      }
+
+      .vp-add-menu-title {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: ${(props) => props.theme.colors.text.muted};
+        padding: 4px 8px 6px;
+      }
+
+      .vp-add-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        border: none;
+        background: transparent;
+        color: ${(props) => props.theme.text};
+        font-size: 12px;
+        padding: 5px 8px;
+        border-radius: 4px;
+        text-align: left;
+        cursor: pointer;
+
+        &:hover:not(:disabled) {
+          background: ${(props) => props.theme.colors.text.muted}22;
+        }
+
+        &:disabled {
+          opacity: 0.5;
+          cursor: default;
+        }
+
+        .vp-add-menu-label {
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+      }
     }
   }
 

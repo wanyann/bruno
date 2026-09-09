@@ -2487,6 +2487,84 @@ export const updateVariableInScope = (variableName, newValue, scopeInfo, collect
   });
 };
 
+/**
+ * Add a manually-written request variable (one with no detected scope) to a
+ * chosen scope: 'environment', 'collection' or 'global'. Creates it with the
+ * given value (usually empty) if it does not already exist in that scope.
+ * @param {string} variableName
+ * @param {'environment'|'collection'|'global'} scope
+ * @param {string} collectionUid
+ * @param {string} [value]
+ */
+const collectionRootOf = (_collection) => (_collection.draft && _collection.draft.root) || _collection.root || {};
+
+export const addToVariableScope = (variableName, scope, collectionUid, value = '') => (dispatch, getState) => {
+  return new Promise((resolve, reject) => {
+    if (!variableName || !scope || !collectionUid) {
+      return reject(new Error('Invalid arguments'));
+    }
+
+    const state = getState();
+    const collection = findCollectionByUid(state.collections.collections, collectionUid);
+
+    try {
+      if (scope === 'global') {
+        const globalEnvironments = state.globalEnvironments?.globalEnvironments || [];
+        const activeGlobalEnvUid = state.globalEnvironments?.activeGlobalEnvironmentUid;
+        const environment = globalEnvironments.find((env) => env.uid === activeGlobalEnvUid);
+
+        if (!environment) {
+          return reject(new Error('No active global environment'));
+        }
+
+        const { updatedVariables } = resolveOrCreateEnabledVariable(environment.variables, variableName, value, false);
+
+        return dispatch(saveGlobalEnvironment({ variables: updatedVariables, environmentUid: activeGlobalEnvUid }))
+          .then(() => resolve())
+          .catch(reject);
+      }
+
+      if (!collection) {
+        return reject(new Error('Collection not found'));
+      }
+
+      if (scope === 'environment') {
+        const activeEnvUid = collection.realActiveEnvironmentUid ?? collection.activeEnvironmentUid;
+        const environment = findEnvironmentInCollection(collection, activeEnvUid);
+
+        if (!environment) {
+          return reject(new Error('No active collection environment'));
+        }
+
+        const { updatedVariables } = resolveOrCreateEnabledVariable(environment.variables, variableName, value, false);
+
+        return dispatch(saveEnvironment(updatedVariables, environment.uid, collectionUid))
+          .then(() => resolve())
+          .catch(reject);
+      }
+
+      if (scope === 'collection') {
+        const variable = resolveEnabledVariable(get(collectionRootOf(collection), 'request.vars.req', []), variableName);
+
+        dispatch(addCollectionVar({
+          collectionUid,
+          type: 'request',
+          var: { name: variableName, value, enabled: true, ...(variable ? { uid: variable.uid } : {}) }
+        }));
+
+        return dispatch(saveCollectionRoot(collectionUid))
+          .then(() => resolve())
+          .catch(reject);
+      }
+
+      return reject(new Error(`Unknown scope: ${scope}`));
+    } catch (error) {
+      toast.error(`Failed to add variable: ${error.message}`);
+      reject(error);
+    }
+  });
+};
+
 // Clears all three script-driven baselines for a given collection:
 //   collection-scope env baseline, collection-scope coll-vars baseline, and the
 //   workspace-scope global-env baseline. Call at the start of any request kickoff
