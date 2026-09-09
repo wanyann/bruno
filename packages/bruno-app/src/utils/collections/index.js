@@ -1880,6 +1880,8 @@ export const isVariableSecret = (scopeInfo) => {
 const VARIABLE_REFERENCE_PATTERN_GLOBAL = /\{\{([^}]+)\}\}/g;
 
 // Collect all string fragments of a request that may contain {{variable}} references.
+// Handles both the JSON `.bru` shape (body.json/text/xml/.../formUrlEncoded/multipartForm)
+// and the YAML `.yml` shape (body.data / lowercase form fields).
 const getRequestVariableScanStrings = (request) => {
   const strings = [];
   if (!request) return strings;
@@ -1889,8 +1891,11 @@ const getRequestVariableScanStrings = (request) => {
   const pushNameValues = (arr) => {
     if (!Array.isArray(arr)) return;
     arr.forEach((entry) => {
-      if (entry && isString(entry.name)) strings.push(entry.name);
-      if (entry && isString(entry.value)) strings.push(entry.value);
+      if (!entry) return;
+      const name = entry.name ?? entry.field?.name ?? entry.key;
+      const value = entry.value ?? entry.field?.value;
+      if (isString(name)) strings.push(name);
+      if (isString(value)) strings.push(value);
     });
   };
 
@@ -1898,12 +1903,19 @@ const getRequestVariableScanStrings = (request) => {
   pushNameValues(request.params);
 
   const body = request.body || {};
+
+  // Raw bodies
+  if (isString(body.json)) strings.push(body.json);
   if (isString(body.text)) strings.push(body.text);
-  // xml/yaml bodies may be stored as `xml` (json collection) or `data` (yaml .bru)
   if (isString(body.xml)) strings.push(body.xml);
+  if (isString(body.sparql)) strings.push(body.sparql);
   if (isString(body.data)) strings.push(body.data);
   if (isString(body.md)) strings.push(body.md);
 
+  // Key-value bodies (Bruno format)
+  pushNameValues(body.formUrlEncoded);
+  pushNameValues(body.multipartForm);
+  // YAML/legacy key-value bodies
   pushNameValues(body.formdata);
   pushNameValues(body.urlencoded);
   pushNameValues(body.files);
