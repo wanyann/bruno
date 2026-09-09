@@ -63,7 +63,7 @@ const VariableGroup = ({ title, scope, variables, collection, item, onSave }) =>
 const PanelSection = ({ title, expanded, onToggle, collapsible = true, children }) => {
   if (!collapsible) {
     return (
-      <div className="vp-section-header expanded">
+      <div className="vp-section-header non-collapsible expanded">
         <span>{title}</span>
       </div>
     );
@@ -122,7 +122,8 @@ const VariablesPanel = () => {
   // Resolve the active item (request) for "variables used in request"
   let item = null;
   if (activeCollection && focusedTab?.uid) {
-    item = findItemInCollection(activeCollection, focusedTab.uid)
+    item = findItemInCollection(activeCollection, focusedTab.itemUid)
+      || findItemInCollection(activeCollection, focusedTab.uid)
       || (focusedTab.pathname ? findItemInCollectionByPathname(activeCollection, focusedTab.pathname) : null);
   }
 

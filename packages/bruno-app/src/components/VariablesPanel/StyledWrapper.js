@@ -103,6 +103,10 @@ const StyledWrapper = styled.div`
       transform: rotate(90deg);
     }
 
+    &.non-collapsible {
+      cursor: default;
+    }
+
     .vp-section-count {
       margin-left: auto;
       color: ${(props) => props.theme.colors.text.muted};

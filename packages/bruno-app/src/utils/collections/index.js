@@ -1915,13 +1915,16 @@ const getRequestVariableScanStrings = (request) => {
 // First: "variables used in this request" — names referenced with {{name}} anywhere
 // in the request editing fields, mapped to their resolved scope and value.
 export const getVariablesUsedInRequest = (collection, item) => {
-  const source = item?.draft ? item.draft : item;
-  const request = source?.request || {};
-  const strings = getRequestVariableScanStrings(request);
+  const draftSource = item?.draft ? item.draft : null;
+  const source = draftSource || item;
+  const strings = getRequestVariableScanStrings(source?.request);
+  // If a draft exists but it carries no scan-able content (e.g. an example or an
+  // empty leaf), fall back to the saved item so referenced variables still show.
+  const effectiveStrings = strings?.length ? strings : getRequestVariableScanStrings(item?.request);
 
   const names = [];
   const seen = new Set();
-  strings.forEach((str) => {
+  effectiveStrings.forEach((str) => {
     if (!isString(str)) return;
     VARIABLE_REFERENCE_PATTERN_GLOBAL.lastIndex = 0;
     let match;
