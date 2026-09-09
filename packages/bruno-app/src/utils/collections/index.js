@@ -1899,6 +1899,10 @@ const getRequestVariableScanStrings = (request) => {
 
   const body = request.body || {};
   if (isString(body.text)) strings.push(body.text);
+  // xml/yaml bodies may be stored as `xml` (json collection) or `data` (yaml .bru)
+  if (isString(body.xml)) strings.push(body.xml);
+  if (isString(body.data)) strings.push(body.data);
+  if (isString(body.md)) strings.push(body.md);
 
   pushNameValues(body.formdata);
   pushNameValues(body.urlencoded);
