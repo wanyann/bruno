@@ -193,16 +193,50 @@ const StyledWrapper = styled.div`
         display: flex;
         align-items: center;
 
-        .vp-value-placeholder {
-          position: absolute;
-          left: 8px;
-          top: 50%;
-          transform: translateY(-50%);
+        .vp-trunc {
+          flex: 1;
+          min-width: 0;
+          font-size: 12px;
+          line-height: 1.4;
+          color: ${(props) => props.theme.text};
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          cursor: text;
+        }
+
+        .vp-trunc-empty {
           color: ${(props) => props.theme.colors.text.muted};
           opacity: 0.6;
+        }
+
+        .vp-textarea {
+          flex: 1;
+          min-width: 0;
+          width: 100%;
+          box-sizing: border-box;
+          border: none;
+          background: transparent;
+          color: ${(props) => props.theme.text};
           font-size: 12px;
-          pointer-events: none;
-          white-space: nowrap;
+          line-height: 1.4;
+          font-family: inherit;
+          padding: 0;
+          resize: none;
+          outline: none;
+
+          &::placeholder {
+            color: ${(props) => props.theme.colors.text.muted};
+            opacity: 0.6;
+          }
+        }
+
+        // Keep native placeholders right-aligned with the value text (smaller left indent).
+        .cm-editor .CodeMirror-placeholder,
+        .CodeMirror .CodeMirror-placeholder {
+          left: 0 !important;
+          color: ${(props) => props.theme.colors.text.muted};
+          opacity: 0.6;
         }
       }
     }

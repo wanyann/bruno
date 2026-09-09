@@ -53,40 +53,52 @@ const VariableRow = ({
   addToOptions = [],
   onAddToScope
 }) => {
+  const hasScope = !hasNoScope(scopeInfo);
+  const isSecret = !!scopeInfo?.secret || !!scopeInfo?.data?.variable?.secret;
   const isReadOnly = READ_ONLY_SCOPES.includes(scopeInfo?.type) || !!scopeInfo?.inheritedFrom;
-  const noScope = hasNoScope(scopeInfo);
   const rawValue = scopeInfo?.value;
 
-  const displayValue = useMemo(() => {
+  const fullValue = useMemo(() => {
     return typeof rawValue === 'string' ? rawValue : toDisplayString(rawValue, '');
   }, [rawValue]);
 
+  const [focused, setFocused] = useState(false);
+  const [draft, setDraft] = useState(fullValue);
   const [menuOpen, setMenuOpen] = useState(false);
   const [openUp, setOpenUp] = useState(false);
   const addWrapRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  const handleChange = useCallback((newValue) => {
+  const valueIsEmpty = fullValue === '' || fullValue === null || fullValue === undefined;
+
+  const useSingleLine = isSecret || isReadOnly;
+
+  // SingleLineEditor (secrets / read-only values)
+  const handleScopeChange = useCallback((newValue) => {
     if (isReadOnly || !onSave) return;
     onSave(newValue);
   }, [isReadOnly, onSave]);
 
-  const handleAddClick = useCallback(() => {
-    const rect = addWrapRef.current?.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - (rect?.bottom ?? 0);
-    const estimateHeight = 4 + 36 + 4 + addToOptions.length * 34 + 8;
-    setOpenUp(spaceBelow < estimateHeight);
-    setMenuOpen((v) => !v);
-  }, [addToOptions.length]);
+  // Multi-line editable textarea (all other rows)
+  const handleTextareaChange = useCallback((e) => {
+    const next = e.target.value;
+    setDraft(next);
+    onSave?.(next);
+  }, [onSave]);
 
-  const handleSelect = useCallback(
-    (scope) => {
-      setMenuOpen(false);
-      onAddToScope?.(name, scope);
-    },
-    [name, onAddToScope]
-  );
+  const handleTextareaBlur = useCallback(() => {
+    setFocused(false);
+    if (onSave) onSave(draft);
+  }, [draft, onSave]);
 
-  const valueIsEmpty = displayValue === '' || displayValue === null || displayValue === undefined;
+  // Auto-grow the textarea to fit its content while editing (multi-line wrap allowed).
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (ta) {
+      ta.style.height = 'auto';
+      ta.style.height = `${ta.scrollHeight}px`;
+    }
+  }, [draft, focused, useSingleLine]);
 
   return (
     <div className="vp-row" data-testid={`vp-row-${name}`}>
@@ -96,22 +108,54 @@ const VariableRow = ({
       </div>
       <div className="vp-value" onContextMenu={(e) => e.preventDefault()}>
         <div className="vp-value-inner">
-          <SingleLineEditor
-            collection={collection}
-            item={item}
-            value={displayValue}
-            readOnly={isReadOnly}
-            onChange={handleChange}
-            enableBrunoVarInfo
-          />
-          {valueIsEmpty && <span className="vp-value-placeholder">No value</span>}
+          {useSingleLine ? (
+            <SingleLineEditor
+              collection={collection}
+              item={item}
+              value={fullValue}
+              readOnly={isReadOnly}
+              placeholder={valueIsEmpty ? 'No value' : undefined}
+              onChange={handleScopeChange}
+              enableBrunoVarInfo
+            />
+          ) : focused ? (
+            <textarea
+              ref={textareaRef}
+              className="vp-textarea"
+              rows={1}
+              value={draft}
+              readOnly={isReadOnly}
+              placeholder="No value"
+              onChange={handleTextareaChange}
+              onBlur={handleTextareaBlur}
+              spellCheck={false}
+            />
+          ) : (
+            <div
+              className={`vp-trunc${valueIsEmpty ? ' vp-trunc-empty' : ''}`}
+              onClick={() => {
+                if (isReadOnly) return;
+                setDraft(fullValue);
+                setFocused(true);
+              }}
+              title={fullValue}
+            >
+              {valueIsEmpty ? 'No value' : fullValue}
+            </div>
+          )}
         </div>
-        {addToEnabled && noScope && (
+        {addToEnabled && !hasScope && (
           <div className="vp-add-wrap" ref={addWrapRef}>
             <button
               type="button"
               className="vp-add-btn"
-              onClick={handleAddClick}
+              onClick={() => {
+                const rect = addWrapRef.current?.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - (rect?.bottom ?? 0);
+                const estimateHeight = 4 + 36 + 4 + addToOptions.length * 34 + 8;
+                setOpenUp(spaceBelow < estimateHeight);
+                setMenuOpen((v) => !v);
+              }}
               title="Add to scope"
               data-testid="vp-add-btn"
             >
@@ -124,7 +168,10 @@ const VariableRow = ({
               <AddToMenu
                 openUp={openUp}
                 options={addToOptions}
-                onSelect={handleSelect}
+                onSelect={(scope) => {
+                  setMenuOpen(false);
+                  onAddToScope?.(name, scope);
+                }}
                 onClose={() => setMenuOpen(false)}
               />
             )}

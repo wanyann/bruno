@@ -2346,10 +2346,7 @@ export const updateVariableInScope = (variableName, newValue, scopeInfo, collect
           // not pre-resolving a secret-name collision here
           // saveEnvironment's writesCollidingSecrets guard rejects it instead.
           return dispatch(saveEnvironment(updatedVariables, environment.uid, collectionUid))
-            .then(() => {
-              toast.success(`Variable "${variableName}" ${variable ? 'updated' : 'created'}`);
-            })
-            .then(resolve)
+            .then(() => resolve())
             .catch(reject);
         }
 
@@ -2454,10 +2451,7 @@ export const updateVariableInScope = (variableName, newValue, scopeInfo, collect
             variables: updatedVariables,
             environmentUid: activeGlobalEnvUid
           }))
-            .then(() => {
-              toast.success(`Variable "${variableName}" ${variable ? 'updated' : 'created'}`);
-            })
-            .then(resolve)
+            .then(() => resolve())
             .catch(reject);
         }
         case 'pathParam': {
