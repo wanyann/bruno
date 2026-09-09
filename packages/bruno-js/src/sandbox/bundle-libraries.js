@@ -16,6 +16,8 @@ const bundleLibraries = async () => {
     import tv4 from "tv4";
     import Ajv from "ajv";
     import addFormats from "ajv-formats";
+    import * as xml2js from "xml2js";
+    import * as timers from "timers";
     globalThis.expect = expect;
     globalThis.assert = assert;
     globalThis.moment = moment;
@@ -25,6 +27,7 @@ const bundleLibraries = async () => {
     globalThis.tv4 = tv4;
     globalThis.Ajv = Ajv;
     globalThis.addFormats = addFormats;
+    globalThis.xml2js = xml2js;
     globalThis.requireObject = {
       ...(globalThis.requireObject || {}),
       'chai': { expect, assert },
@@ -35,7 +38,9 @@ const bundleLibraries = async () => {
       'crypto-js': cryptoJs,
       'tv4': tv4,
       'ajv': Ajv,
-      'ajv-formats': addFormats
+      'ajv-formats': addFormats,
+      'xml2js': xml2js,
+      'timers': timers
     };
 `;
 
@@ -54,6 +59,30 @@ const bundleLibraries = async () => {
           load(id) {
             if (id === 'inline-code') {
               return codeScript;
+            }
+            return null;
+          }
+        },
+        {
+          name: 'builtin-polyfill-plugin',
+          resolveId(id) {
+            if (id === 'timers') {
+              return id;
+            }
+            return null;
+          },
+          load(id) {
+            if (id === 'timers') {
+              return `
+                const setImmediateFn = typeof globalThis.setImmediate === 'function' ? globalThis.setImmediate : (cb, ...args) => setTimeout(cb, 0, ...args);
+                const execute = (fn, ...args) => (typeof fn === 'object' && typeof fn.fn === 'function' ? fn.fn(...args) : fn(...args));
+                const wrappedSetImmediate = (cb, ...args) => setImmediateFn(() => execute(cb), ...args);
+                const wrappedSetTimeout = (cb, ...args) => setTimeout(() => execute(cb), ...args);
+                const wrappedClearTimeout = (id) => clearTimeout(id);
+                const wrappedClearInterval = (id) => clearInterval(id);
+                const wrappedSetInterval = (cb, ...args) => setInterval(() => execute(cb), ...args);
+                export { wrappedSetImmediate as setImmediate, wrappedSetTimeout as setTimeout, wrappedClearTimeout as clearTimeout, wrappedSetInterval as setInterval, wrappedClearInterval as clearInterval };
+              `;
             }
             return null;
           }

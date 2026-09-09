@@ -36,6 +36,7 @@ const initialState = {
   isEnvironmentSettingsModalOpen: false,
   isGlobalEnvironmentSettingsModalOpen: false,
   activePreferencesTab: 'general',
+  variablesPanelOpen: true,
   preferences: {
     request: {
       sslVerification: true,
@@ -144,6 +145,9 @@ export const appSlice = createSlice({
         state.sidebarCollapsed = collapsed;
       }
       state.sidebarHydrated = true;
+    },
+    setVariablesPanelOpen: (state, action) => {
+      state.variablesPanelOpen = !!action.payload;
     },
     startSnapshotHydrationSession: (state, action) => {
       const {
@@ -336,7 +340,8 @@ export const {
   setEnvVarSearchQuery,
   setEnvVarSearchExpanded,
   setIsCreatingCollection,
-  setIsOpeningCollection
+  setIsOpeningCollection,
+  setVariablesPanelOpen
 } = appSlice.actions;
 
 /**

@@ -279,6 +279,20 @@ const StyledWrapper = styled.div`
       border-bottom-right-radius: ${(props) => props.theme.border.radius.sm};
     }
   }
+
+  .variables-panel-toggle-btn {
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+      background: rgba(167, 139, 250, 0.35);
+      box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.4);
+    }
+
+    &.is-open:hover {
+      background: rgba(166, 173, 200, 0.15);
+      box-shadow: 0 0 0 2px rgba(166, 173, 200, 0.3);
+    }
+  }
 `;
 
 export default StyledWrapper;

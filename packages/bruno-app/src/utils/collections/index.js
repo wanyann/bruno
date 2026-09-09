@@ -1877,6 +1877,169 @@ export const isVariableSecret = (scopeInfo) => {
   return false;
 };
 
+const VARIABLE_REFERENCE_PATTERN_GLOBAL = /\{\{([^}]+)\}\}/g;
+
+// Collect all string fragments of a request that may contain {{variable}} references.
+const getRequestVariableScanStrings = (request) => {
+  const strings = [];
+  if (!request) return strings;
+
+  if (isString(request.url)) strings.push(request.url);
+
+  const pushNameValues = (arr) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((entry) => {
+      if (entry && isString(entry.name)) strings.push(entry.name);
+      if (entry && isString(entry.value)) strings.push(entry.value);
+    });
+  };
+
+  pushNameValues(request.headers);
+  pushNameValues(request.params);
+
+  const body = request.body || {};
+  if (isString(body.text)) strings.push(body.text);
+
+  pushNameValues(body.formdata);
+  pushNameValues(body.urlencoded);
+  pushNameValues(body.files);
+
+  if (typeof body.graphql === 'object' && body.graphql !== null) {
+    if (isString(body.graphql.query)) strings.push(body.graphql.query);
+    if (isString(body.graphql.variables)) strings.push(body.graphql.variables);
+  }
+
+  return strings;
+};
+
+// First: "variables used in this request" — names referenced with {{name}} anywhere
+// in the request editing fields, mapped to their resolved scope and value.
+export const getVariablesUsedInRequest = (collection, item) => {
+  const source = item?.draft ? item.draft : item;
+  const request = source?.request || {};
+  const strings = getRequestVariableScanStrings(request);
+
+  const names = [];
+  const seen = new Set();
+  strings.forEach((str) => {
+    if (!isString(str)) return;
+    VARIABLE_REFERENCE_PATTERN_GLOBAL.lastIndex = 0;
+    let match;
+    while ((match = VARIABLE_REFERENCE_PATTERN_GLOBAL.exec(str)) !== null) {
+      const name = match[1].trim();
+      if (name && !seen.has(name)) {
+        seen.add(name);
+        names.push(name);
+      }
+    }
+  });
+
+  const scopePriority = {
+    request: 0,
+    folder: 1,
+    collection: 2,
+    environment: 3,
+    global: 4,
+    runtime: 5,
+    pathParam: 6,
+    process: 7,
+    dynamic: 8,
+    oauth2: 9
+  };
+
+  const variables = names
+    .map((name) => ({ name, scopeInfo: getVariableScope(name, collection, item) }))
+    .sort((a, b) => {
+      const pa = scopePriority[a.scopeInfo?.type] ?? 99;
+      const pb = scopePriority[b.scopeInfo?.type] ?? 99;
+      return pa - pb || a.name.localeCompare(b.name);
+    });
+
+  return variables;
+};
+
+// All variables grouped by scope, for the "All Variables" section.
+export const getAllVariablesByScope = (collection, item) => {
+  const result = {
+    environment: [],
+    collection: [],
+    global: []
+  };
+
+  if (!collection) {
+    return result;
+  }
+
+  // Environment group — active environment inherited variables + secrets
+  const activeEnvUid = collection.realActiveEnvironmentUid ?? collection.activeEnvironmentUid;
+  const environment = findEnvironmentInCollection(collection, activeEnvUid);
+  if (environment) {
+    const { variables } = resolveEnvironmentInheritance({
+      environments: collection.environments,
+      targetEnvironment: environment,
+      merge: true
+    });
+    const seen = new Set();
+    (Array.isArray(variables) ? variables : []).forEach((variable) => {
+      if (!variable || !variable.name || !variable.enabled || seen.has(variable.name)) return;
+      seen.add(variable.name);
+      result.environment.push({
+        name: variable.name,
+        scopeInfo: {
+          type: 'environment',
+          value: variable.value,
+          data: { environment, variable },
+          inheritedFrom: variable.inheritedFrom,
+          secret: !!variable.secret
+        }
+      });
+    });
+    result.environment.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  // Collection group — collection-level vars (title = collection name)
+  const collectionRoot = (collection.draft && collection.draft.root) || collection.root || {};
+  const collectionVars = get(collectionRoot, 'request.vars.req', []);
+  const seenCollection = new Set();
+  (Array.isArray(collectionVars) ? collectionVars : []).forEach((variable) => {
+    if (!variable || !variable.name || !variable.enabled || seenCollection.has(variable.name)) return;
+    seenCollection.add(variable.name);
+    result.collection.push({
+      name: variable.name,
+      scopeInfo: {
+        type: 'collection',
+        value: variable.value,
+        data: { collection, variable }
+      }
+    });
+  });
+  result.collection.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Global group — active global environment inherited + secrets
+  const { globalEnvironments, activeGlobalEnvironmentUid } = collection;
+  const globalEnv = find(globalEnvironments, (e) => e.uid === activeGlobalEnvironmentUid);
+  if (globalEnv) {
+    const seenGlobal = new Set();
+    (Array.isArray(globalEnv.variables) ? globalEnv.variables : []).forEach((variable) => {
+      if (!variable || !variable.name || !variable.enabled || seenGlobal.has(variable.name)) return;
+      seenGlobal.add(variable.name);
+      result.global.push({
+        name: variable.name,
+        scopeInfo: {
+          type: 'global',
+          value: variable.value,
+          data: { variableName: variable.name, value: variable.value, variable },
+          inheritedFrom: variable.inheritedFrom,
+          secret: !!variable.secret
+        }
+      });
+    });
+    result.global.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  return result;
+};
+
 const sidebarEntryCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 const getSidebarEntryName = (entry) => {

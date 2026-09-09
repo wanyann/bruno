@@ -15,39 +15,23 @@ const config = {
     }
   ],
   files: ['**/*'],
-  afterSign: 'notarize.js',
   mac: {
     artifactName: '${name}_${version}_${arch}_${os}.${ext}',
     category: 'public.app-category.developer-tools',
     target: [
       {
-        target: 'pkg',
-        arch: ['x64', 'arm64']
+        target: 'dir',
+        arch: ['arm64']
       },
       {
         target: 'dmg',
-        arch: ['x64', 'arm64']
-      },
-      {
-        target: 'zip',
-        arch: ['x64', 'arm64']
+        arch: ['arm64']
       }
     ],
     icon: 'resources/icons/mac/icon.icns',
-    hardenedRuntime: true,
-    identity: 'Anoop MD (W7LPPWA48L)',
-    entitlements: 'resources/entitlements.mac.plist',
-    entitlementsInherit: 'resources/entitlements.mac.plist',
-    notarize: false,
-    requirements: 'resources/app-requirements.txt',
-    protocols: [
-      {
-        name: 'Bruno',
-        schemes: [
-          'bruno'
-        ]
-      }
-    ]
+    hardenedRuntime: false,
+    identity: null,
+    notarize: false
   },
   linux: {
     artifactName: '${name}_${version}_${arch}_${os}.${ext}',

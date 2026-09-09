@@ -11,6 +11,7 @@ import OpenCollection from 'components/Sidebar/OpenCollection';
 import StatusBar from 'components/StatusBar';
 import AppTitleBar from 'components/AppTitleBar';
 import ApiSpecPanel from 'components/ApiSpecPanel';
+import VariablesPanel from 'components/VariablesPanel';
 import TabPanelErrorBoundary from 'components/RequestTabPanel/TabPanelErrorBoundary';
 // import ErrorCapture from 'components/ErrorCapture';
 import { useSelector } from 'react-redux';
@@ -145,6 +146,7 @@ export default function Main() {
           {isAiSidebarOpen && activeCollection && !isAiPoppedOut && !showApiSpecPage && !showManageWorkspacePage && (
             <AiChatSidebar collection={activeCollection} />
           )}
+          <VariablesPanel />
         </StyledWrapper>
       </div>
 

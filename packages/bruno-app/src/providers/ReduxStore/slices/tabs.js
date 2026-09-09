@@ -155,6 +155,7 @@ export const tabsSlice = createSlice({
           responseFormat: null,
           responseViewTab: null,
           scriptPaneTab: null,
+          variablesPanelOpen: false,
           preview: preview !== undefined
             ? preview
             : !nonReplaceableTabTypes.includes(type),
@@ -194,6 +195,7 @@ export const tabsSlice = createSlice({
         gqlDocsOpen: false,
         tableColumnWidths: {},
         scriptPaneTab: null,
+        variablesPanelOpen: false,
         docsEditing: false,
         ...(uid ? { folderUid: uid } : {}),
         preview: preview !== undefined
@@ -392,6 +394,20 @@ export const tabsSlice = createSlice({
 
       if (tab) {
         tab.variablesPaneHeight = action.payload.variablesPaneHeight;
+      }
+    },
+    updateVariablesPanelOpen: (state, action) => {
+      const tab = find(state.tabs, (t) => t.uid === action.payload.uid);
+
+      if (tab) {
+        tab.variablesPanelOpen = action.payload.open;
+      }
+    },
+    updateVariablesPanelWidth: (state, action) => {
+      const tab = find(state.tabs, (t) => t.uid === action.payload.uid);
+
+      if (tab) {
+        tab.variablesPanelWidth = action.payload.width;
       }
     },
     closeTabs: (state, action) => {
@@ -666,7 +682,9 @@ export const {
   updateQueryBuilderOpen,
   updateQueryBuilderWidth,
   updateVariablesPaneOpen,
-  updateVariablesPaneHeight
+  updateVariablesPaneHeight,
+  updateVariablesPanelOpen,
+  updateVariablesPanelWidth
 } = tabsSlice.actions;
 
 export default tabsSlice.reducer;

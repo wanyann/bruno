@@ -32,6 +32,7 @@ import { findItemInCollection, findItemInCollectionByPathname } from 'utils/coll
 import find from 'lodash/find';
 import get from 'lodash/get';
 import { addTab, focusTab, setTabAppPreview } from 'providers/ReduxStore/slices/tabs';
+import { setVariablesPanelOpen } from 'providers/ReduxStore/slices/app';
 import { uuid } from 'utils/common';
 import toast from 'react-hot-toast';
 import Dropdown from 'components/Dropdown';
@@ -42,6 +43,7 @@ import EnvironmentSelector from 'components/Environments/EnvironmentSelector';
 import ToolHint from 'components/ToolHint';
 import JsSandboxMode from 'components/SecuritySettings/JsSandboxMode';
 import ActionIcon from 'ui/ActionIcon';
+import BracesIcon from 'components/VariablesPanel/BracesIcon';
 import { getRevealInFolderLabel } from 'utils/common/platform';
 import { normalizePath } from 'utils/common/path';
 import classNames from 'classnames';
@@ -70,6 +72,7 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
   const tabs = useSelector((state) => state.tabs.tabs);
   const activeTabUid = useSelector((state) => state.tabs.activeTabUid);
   const preferences = useSelector((state) => state.app.preferences);
+  const variablesPanelOpen = useSelector((state) => state.app.variablesPanelOpen);
   const isAiEnabled = get(preferences, 'ai.enabled', false);
   const isAiSidebarOpen = useSelector((state) => state.chat.isOpen);
 
@@ -270,6 +273,10 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
         type: 'collection-runner'
       })
     );
+  };
+
+  const handleToggleVariablesPanel = () => {
+    dispatch(setVariablesPanelOpen(!variablesPanelOpen));
   };
 
   const viewVariables = () => {
@@ -808,6 +815,31 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
               <span>
                 <EnvironmentSelector collection={collection} />
               </span>
+              {/* Variables Panel - always visible */}
+              <ActionIcon
+                onClick={handleToggleVariablesPanel}
+                aria-label="Variables"
+                size="sm"
+                data-testid="variables-panel-toggle"
+                className={`variables-panel-toggle-btn ${variablesPanelOpen ? 'is-open' : ''}`}
+                style={variablesPanelOpen
+                  ? {
+                      width: 28,
+                      backgroundColor: 'transparent',
+                      border: '1px solid #A6ADC8',
+                      color: '#A6ADC8',
+                      marginLeft: 4
+                    }
+                  : {
+                      width: 28,
+                      background: '#a78bfa',
+                      border: '1px solid transparent',
+                      color: '#000',
+                      marginLeft: 4
+                    }}
+              >
+                <BracesIcon size={20} />
+              </ActionIcon>
             </>
           )}
         </div>
