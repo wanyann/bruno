@@ -63,9 +63,12 @@ const VariableGroup = ({ title, scope, variables, collection, item, onSave }) =>
 const PanelSection = ({ title, expanded, onToggle, collapsible = true, children }) => {
   if (!collapsible) {
     return (
-      <div className="vp-section-header non-collapsible expanded">
-        <span>{title}</span>
-      </div>
+      <>
+        <div className="vp-section-header non-collapsible expanded">
+          <span>{title}</span>
+        </div>
+        {children}
+      </>
     );
   }
 
