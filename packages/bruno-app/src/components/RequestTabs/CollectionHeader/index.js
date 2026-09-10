@@ -28,7 +28,9 @@ import { showInFolder } from 'providers/ReduxStore/slices/collections/actions';
 import { toggleCollectionFileMode } from 'providers/ReduxStore/slices/collections';
 import { toggleAiSidebar } from 'providers/ReduxStore/slices/chat';
 import { showMigrateToYmlModal } from 'providers/ReduxStore/slices/collection-migration';
-import { findItemInCollection, findItemInCollectionByPathname } from 'utils/collections';
+import { findItemInCollection, findItemInCollectionByPathname, getGlobalEnvironmentVariables, getGlobalEnvironmentVariablesMasked } from 'utils/collections';
+import { getLanguages } from 'utils/codegenerator/targets';
+import { generateSnippet } from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/utils/snippet-generator';
 import find from 'lodash/find';
 import get from 'lodash/get';
 import { addTab, focusTab, setTabAppPreview } from 'providers/ReduxStore/slices/tabs';
@@ -75,6 +77,7 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
   const variablesPanelOpen = useSelector((state) => state.app.variablesPanelOpen);
   const isAiEnabled = get(preferences, 'ai.enabled', false);
   const isAiSidebarOpen = useSelector((state) => state.chat.isOpen);
+  const { globalEnvironments, activeGlobalEnvironmentUid } = useSelector((state) => state.globalEnvironments);
 
   // Get the current active workspace
   const currentWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
@@ -277,6 +280,48 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
 
   const handleToggleVariablesPanel = () => {
     dispatch(setVariablesPanelOpen(!variablesPanelOpen));
+  };
+
+  // Copy the active request as a curl snippet (shell / curl, variables interpolated),
+  // matching the default Generate Code window.
+  const handleCopyCurl = async () => {
+    const item = activeItem;
+    if (!item) return;
+    const url = get(item, 'draft.request.url') !== undefined ? get(item, 'draft.request.url') : get(item, 'request.url');
+    if (!url) {
+      toast.error('URL is required');
+      return;
+    }
+
+    const enhancedCollection = {
+      ...collection,
+      globalEnvironmentVariables: getGlobalEnvironmentVariables({ globalEnvironments, activeGlobalEnvironmentUid }),
+      globalEnvSecrets: getGlobalEnvironmentVariablesMasked({ globalEnvironments, activeGlobalEnvironmentUid }),
+      globalEnvironments,
+      activeGlobalEnvironmentUid
+    };
+
+    try {
+      const language = getLanguages()[0]; // Shell-curl
+      const snippet = await generateSnippet({ language, item, collection: enhancedCollection, shouldInterpolate: true });
+
+      // Prefer the async clipboard API, falling back to a hidden textarea for older Electron.
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(snippet);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = snippet;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success('Copied to clipboard!');
+    } catch (error) {
+      toast.error('Failed to copy curl to clipboard');
+    }
   };
 
   const viewVariables = () => {
@@ -811,6 +856,18 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
                   <IconDots size={16} strokeWidth={1.5} />
                 </ActionIcon>
               </MenuDropdown>
+              {/* Copy curl for active request - always visible */}
+              <ToolHint text="Copy as cURL" toolhintId="CopyCurlToolhintId" place="bottom">
+                <ActionIcon
+                  onClick={handleCopyCurl}
+                  aria-label="Copy as cURL"
+                  size="sm"
+                  data-testid="copy-curl"
+                  style={{ border: `1px solid ${theme.border.border1}`, borderRadius: theme.border.radius.base, width: 24, marginLeft: 4 }}
+                >
+                  <IconCode size={16} strokeWidth={1.5} />
+                </ActionIcon>
+              </ToolHint>
               {/* Environment Selector - always visible */}
               <span>
                 <EnvironmentSelector collection={collection} />
