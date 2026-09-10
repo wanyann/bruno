@@ -852,7 +852,7 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
               <JsSandboxMode collection={collection} />
               {/* Overflow menu */}
               <MenuDropdown items={overflowMenuItems} placement="bottom-end" data-testid="more-actions">
-                <ActionIcon label="More actions" size="sm" style={{ border: `1px solid ${theme.border.border1}`, borderRadius: theme.border.radius.base, width: 24, marginRight: 4, marginLeft: 4 }}>
+                <ActionIcon label="More actions" size="sm" style={{ border: `1px solid ${theme.border.border1}`, borderRadius: theme.border.radius.base, width: 24 }}>
                   <IconDots size={16} strokeWidth={1.5} />
                 </ActionIcon>
               </MenuDropdown>
@@ -863,7 +863,7 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
                   aria-label="Copy as cURL"
                   size="sm"
                   data-testid="copy-curl"
-                  style={{ border: `1px solid ${theme.border.border1}`, borderRadius: theme.border.radius.base, width: 24, marginLeft: 4 }}
+                  style={{ border: `1px solid ${theme.border.border1}`, borderRadius: theme.border.radius.base, width: 24 }}
                 >
                   <IconCode size={16} strokeWidth={1.5} />
                 </ActionIcon>
