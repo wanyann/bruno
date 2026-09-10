@@ -100,13 +100,45 @@ const VariableRow = ({
     }
   }, [draft, focused, useSingleLine]);
 
+  // Bring focus into the editor/textarea whenever the row enters edit mode.
+  useEffect(() => {
+    if (focused && !useSingleLine && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [focused, useSingleLine]);
+
+  const handleValueClick = useCallback((e) => {
+    // Don't hijack clicks on the '+' button or the add-to menu.
+    if (e.target.closest('.vp-add-btn, .vp-add-menu')) return;
+    if (isReadOnly) return;
+    if (useSingleLine) {
+      // Click anywhere in the value cell should focus the CodeMirror editor.
+      const input = e.currentTarget.querySelector('.CodeMirror textarea, .CodeMirror input, .CodeMirror-scroll');
+      if (input && !input.contains(e.target)) {
+        input.focus();
+      }
+      return;
+    }
+    if (focused) {
+      // Already editing: focus the textarea if the click hit the cell padding.
+      const ta = textareaRef.current;
+      if (ta && e.target !== ta && !ta.contains(e.target)) {
+        ta.focus();
+      }
+      return;
+    }
+    // Not editing yet: enter edit mode with the full value.
+    setDraft(fullValue);
+    setFocused(true);
+  }, [isReadOnly, useSingleLine, focused, fullValue]);
+
   return (
     <div className="vp-row" data-testid={`vp-row-${name}`}>
       <div className="vp-row-name" title={name}>
         {showScope && <ScopeBadge type={scopeInfo?.type} />}
         <span className="vp-row-name-text">{name}</span>
       </div>
-      <div className="vp-value" onContextMenu={(e) => e.preventDefault()}>
+      <div className="vp-value" onContextMenu={(e) => e.preventDefault()} onClick={handleValueClick}>
         <div className="vp-value-inner">
           {useSingleLine ? (
             <SingleLineEditor
