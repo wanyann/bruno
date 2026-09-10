@@ -860,6 +860,7 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
               <ToolHint text="Copy as cURL" toolhintId="CopyCurlToolhintId" place="bottom">
                 <ActionIcon
                   onClick={handleCopyCurl}
+                  disabled={!isHttpRequestActive}
                   aria-label="Copy as cURL"
                   size="sm"
                   data-testid="copy-curl"
