@@ -141,13 +141,26 @@ const VariableRow = ({
     setFocused(true);
   }, [isReadOnly, useSingleLine, focused, fullValue]);
 
+  // Enter edit mode on mouse-down rather than click. This picks the row before the
+  // previously-expanded row above it collapses (layout shift), so clicks on a row
+  // below a tall expanded value still focus it correctly.
+  const handleValueMouseDown = useCallback((e) => {
+    if (e.target.closest('.vp-add-btn, .vp-add-menu')) return;
+    if (isReadOnly) return;
+    if (useSingleLine) return;
+    if (!focused) {
+      setDraft(fullValue);
+      setFocused(true);
+    }
+  }, [isReadOnly, useSingleLine, focused, fullValue]);
+
   return (
     <div className="vp-row" data-testid={`vp-row-${name}`}>
       <div className="vp-row-name" title={name}>
         {showScope && <ScopeBadge type={scopeInfo?.type} />}
         <span className="vp-row-name-text">{name}</span>
       </div>
-      <div className="vp-value" onContextMenu={(e) => e.preventDefault()} onClick={handleValueClick}>
+      <div className="vp-value" onContextMenu={(e) => e.preventDefault()} onMouseDown={handleValueMouseDown} onClick={handleValueClick}>
         <div className="vp-value-inner">
           {useSingleLine ? (
             <SingleLineEditor
