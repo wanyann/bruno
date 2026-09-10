@@ -68,6 +68,7 @@ const VariableRow = ({
   const [openUp, setOpenUp] = useState(false);
   const addWrapRef = useRef(null);
   const textareaRef = useRef(null);
+  const collapseTimerRef = useRef(null);
 
   const valueIsEmpty = fullValue === '' || fullValue === null || fullValue === undefined;
 
@@ -87,8 +88,10 @@ const VariableRow = ({
   }, [onSave]);
 
   const handleTextareaBlur = useCallback(() => {
-    setFocused(false);
     if (onSave) onSave(draft);
+    // Delay collapsing the expanded value so a click on a row below (which blurs a
+    // taller expanded row above) still lands on the target before the layout shifts.
+    collapseTimerRef.current = setTimeout(() => setFocused(false), 120);
   }, [draft, onSave]);
 
   // Auto-grow the textarea to fit its content while editing (multi-line wrap allowed).
@@ -125,7 +128,8 @@ const VariableRow = ({
       return;
     }
     if (focused) {
-      // Already editing: focus the textarea and move the caret to the end.
+      // Already editing: cancel a pending collapse and focus the caret at the end.
+      clearTimeout(collapseTimerRef.current);
       const ta = textareaRef.current;
       if (ta && e.target !== ta && !ta.contains(e.target)) {
         ta.focus();
@@ -141,18 +145,8 @@ const VariableRow = ({
     setFocused(true);
   }, [isReadOnly, useSingleLine, focused, fullValue]);
 
-  // Enter edit mode on mouse-down rather than click. This picks the row before the
-  // previously-expanded row above it collapses (layout shift), so clicks on a row
-  // below a tall expanded value still focus it correctly.
-  const handleValueMouseDown = useCallback((e) => {
-    if (e.target.closest('.vp-add-btn, .vp-add-menu')) return;
-    if (isReadOnly) return;
-    if (useSingleLine) return;
-    if (!focused) {
-      setDraft(fullValue);
-      setFocused(true);
-    }
-  }, [isReadOnly, useSingleLine, focused, fullValue]);
+  // Clear any pending collapse when the row unmounts.
+  useEffect(() => () => clearTimeout(collapseTimerRef.current), []);
 
   return (
     <div className="vp-row" data-testid={`vp-row-${name}`}>
@@ -160,7 +154,7 @@ const VariableRow = ({
         {showScope && <ScopeBadge type={scopeInfo?.type} />}
         <span className="vp-row-name-text">{name}</span>
       </div>
-      <div className="vp-value" onContextMenu={(e) => e.preventDefault()} onMouseDown={handleValueMouseDown} onClick={handleValueClick}>
+      <div className="vp-value" onContextMenu={(e) => e.preventDefault()} onClick={handleValueClick}>
         <div className="vp-value-inner">
           {useSingleLine ? (
             <SingleLineEditor
