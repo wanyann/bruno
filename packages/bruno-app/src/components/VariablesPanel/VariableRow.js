@@ -103,7 +103,12 @@ const VariableRow = ({
   // Bring focus into the editor/textarea whenever the row enters edit mode.
   useEffect(() => {
     if (focused && !useSingleLine && textareaRef.current) {
-      textareaRef.current.focus();
+      const ta = textareaRef.current;
+      ta.focus();
+      const len = ta.value.length;
+      try {
+        ta.setSelectionRange(len, len);
+      } catch {}
     }
   }, [focused, useSingleLine]);
 
@@ -120,10 +125,14 @@ const VariableRow = ({
       return;
     }
     if (focused) {
-      // Already editing: focus the textarea if the click hit the cell padding.
+      // Already editing: focus the textarea and move the caret to the end.
       const ta = textareaRef.current;
       if (ta && e.target !== ta && !ta.contains(e.target)) {
         ta.focus();
+        const len = ta.value.length;
+        try {
+          ta.setSelectionRange(len, len);
+        } catch {}
       }
       return;
     }
