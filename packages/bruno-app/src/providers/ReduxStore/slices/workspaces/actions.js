@@ -21,7 +21,7 @@ import {
   markSnapshotCollectionHydrated,
   clearSnapshotHydrationSession
 } from '../app';
-import { openConsole, closeConsole, setActiveTab as setActiveDevToolsTab, TAB_IDENFIERS as DEVTOOL_TABS, addLog } from '../logs';
+import { openConsole, closeConsole, setActiveTab as setActiveDevToolsTab, TAB_IDENFIERS as DEVTOOL_TABS } from '../logs';
 import { normalizePath } from 'utils/common/path';
 import { hydrateMockServerInstances } from 'utils/mock-server/mock-server-instances';
 import { hydrateTabs, getActiveTabFromSnapshot, hydrateSnapshotLookups, getCollectionSnapshotFromLookups, WORKSPACE_TAB_UID_SUFFIX_BY_TYPE } from 'utils/snapshot';
@@ -762,46 +762,13 @@ export const switchWorkspace = (workspaceUid) => {
             }
             if (item) {
               const treePath = getTreePathFromCollectionToItem(targetCollection, item);
-              const expandedFds = [];
               (treePath || []).forEach((entry) => {
                 if (entry && entry.type === 'folder' && entry.uid) {
-                  expandedFds.push(entry.name || entry.uid);
                   dispatch(expandItem({ collectionUid: targetCollection.uid, itemUid: entry.uid }));
                 }
               });
-              try {
-                dispatch(addLog({
-                  type: 'log',
-                  args: ['[vp-tree-dbg]', {
-                    path: activeTab?.pathname,
-                    itemFound: true,
-                    itemType: item.type,
-                    itemName: item.name,
-                    itemUid: item.uid,
-                    treePath: (treePath || []).map((e) => ({
-                      type: e.type,
-                      name: e.name,
-                      uid: e.uid
-                    })),
-                    foldersExpanded: expandedFds,
-                    itemsCount: (targetCollection?.items || []).length
-                  }],
-                  timestamp: new Date().toISOString()
-                }));
-              } catch (e) { /* ignore */ }
               return true;
             }
-            try {
-              dispatch(addLog({
-                type: 'log',
-                args: ['[vp-tree-dbg]', {
-                  path: activeTab?.pathname,
-                  itemFound: false,
-                  itemsCount: (targetCollection?.items || []).length
-                }],
-                timestamp: new Date().toISOString()
-              }));
-            } catch (e) { /* ignore */ }
             return false;
           };
 
