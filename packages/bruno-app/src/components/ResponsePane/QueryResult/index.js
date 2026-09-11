@@ -61,16 +61,29 @@ export const useInitialResponseFormat = (dataBuffer, headers) => {
     const detectedContentType = detectContentTypeFromBase64(dataBuffer);
 
     let contentType = getContentType(headers);
+    const rawBodyText = decodeTextHead(dataBuffer);
 
     // Fall back to sniffing the body when the header content-type is missing/empty.
     // This covers responses returned as an array-header shape the header lookup
     // may not surface, while audio/image/pdfs keep their detected type above.
+    let fallbackSourcedFromBody = false;
     if (contentType === '' || contentType === undefined) {
-      const bodyText = decodeTextHead(dataBuffer);
-      if (bodyText.startsWith('{') || bodyText.startsWith('[')) {
+      if (rawBodyText.startsWith('{') || rawBodyText.startsWith('[')) {
         contentType = 'application/json';
+        fallbackSourcedFromBody = true;
       }
     }
+
+    console.log('[vp-format-dbg]', {
+      contentType,
+      detectedContentType,
+      fallbackSourcedFromBody,
+      bodyHead: rawBodyText.slice(0, 80),
+      headersType: Array.isArray(headers) ? 'array' : typeof headers,
+      headersKeys: Array.isArray(headers)
+        ? headers.map((h) => (h && (h.name ?? (Array.isArray(h) ? h[0] : null))))
+        : (headers && typeof headers === 'object' ? Object.keys(headers) : null)
+    });
 
     // Wait until both content types are available
     if (detectedContentType === null || contentType === undefined) {

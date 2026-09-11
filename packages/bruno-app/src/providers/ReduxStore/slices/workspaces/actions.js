@@ -9,7 +9,8 @@ import {
   setWorkspaceScratchCollection
 } from '../workspaces';
 import { createCollection, openMultipleCollections, openScratchCollectionEvent, mountCollection, hydrateCollectionWithUiStateSnapshot } from '../collections/actions';
-import { removeCollection, addTransientDirectory, updateCollectionMountStatus, expandCollection, sortCollections } from '../collections';
+import { removeCollection, addTransientDirectory, updateCollectionMountStatus, expandCollection, expandItem, sortCollections } from '../collections';
+import { findItemInCollection, getTreePathFromCollectionToItem } from 'utils/collections';
 import { sanitizeName } from 'utils/common/regex';
 import { clearCollectionState } from '../openapi-sync';
 import { updateGlobalEnvironments } from '../global-environments';
@@ -542,6 +543,21 @@ export const hydrateSnapshotForOpenedCollection = (collectionPathname) => {
       );
       if (activeTab) {
         dispatch(addTab(activeTab));
+
+        // Reveal the active request by expanding every ancestor folder so the
+        // restored tab is visible in the sidebar even when it lives in subfolders.
+        const activeItemUid = activeTab?.itemUid || activeTab?.uid;
+        if (activeItemUid) {
+          const activeItem = findItemInCollection(collection, activeItemUid);
+          if (activeItem) {
+            const treePath = getTreePathFromCollectionToItem(collection, activeItem);
+            (treePath || []).forEach((entry) => {
+              if (entry && entry.type === 'folder' && entry.uid) {
+                dispatch(expandItem({ collectionUid: collection.uid, itemUid: entry.uid }));
+              }
+            });
+          }
+        }
       }
     }
 
