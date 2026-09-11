@@ -21,7 +21,7 @@ import {
   markSnapshotCollectionHydrated,
   clearSnapshotHydrationSession
 } from '../app';
-import { openConsole, closeConsole, setActiveTab as setActiveDevToolsTab, TAB_IDENFIERS as DEVTOOL_TABS } from '../logs';
+import { openConsole, closeConsole, setActiveTab as setActiveDevToolsTab, TAB_IDENFIERS as DEVTOOL_TABS, addLog } from '../logs';
 import { normalizePath } from 'utils/common/path';
 import { hydrateMockServerInstances } from 'utils/mock-server/mock-server-instances';
 import { hydrateTabs, getActiveTabFromSnapshot, hydrateSnapshotLookups, getCollectionSnapshotFromLookups, WORKSPACE_TAB_UID_SUFFIX_BY_TYPE } from 'utils/snapshot';
@@ -748,6 +748,70 @@ export const switchWorkspace = (workspaceUid) => {
 
         if (activeTab) {
           dispatch(addTab(activeTab));
+
+          // Reveal the restored request by expanding every ancestor folder so the
+          // active tab is visible in the sidebar even when it lives in subfolders.
+          // Items load asynchronously during collection mount, so resolve via the
+          // live store and, if the tree isn't loaded yet, poll until it appears.
+          const collectionUid = activeCollection.uid;
+          const revealActiveItemFolders = (targetCollection) => {
+            const activeItemUid = activeTab?.itemUid || activeTab?.uid;
+            let item = activeItemUid ? findItemInCollection(targetCollection, activeItemUid) : null;
+            if (!item && activeTab?.pathname) {
+              item = findItemInCollectionByPathname(targetCollection, activeTab.pathname);
+            }
+            if (item) {
+              const treePath = getTreePathFromCollectionToItem(targetCollection, item);
+              const expandedFds = [];
+              (treePath || []).forEach((entry) => {
+                if (entry && entry.type === 'folder' && entry.uid) {
+                  expandedFds.push(entry.name || entry.uid);
+                  dispatch(expandItem({ collectionUid: targetCollection.uid, itemUid: entry.uid }));
+                }
+              });
+              try {
+                dispatch(addLog({
+                  type: 'log',
+                  args: ['[vp-tree-dbg]', {
+                    path: activeTab?.pathname,
+                    itemFound: true,
+                    foldersExpanded: expandedFds,
+                    itemsCount: (targetCollection?.items || []).length
+                  }],
+                  timestamp: new Date().toISOString()
+                }));
+              } catch (e) { /* ignore */ }
+              return true;
+            }
+            try {
+              dispatch(addLog({
+                type: 'log',
+                args: ['[vp-tree-dbg]', {
+                  path: activeTab?.pathname,
+                  itemFound: false,
+                  itemsCount: (targetCollection?.items || []).length
+                }],
+                timestamp: new Date().toISOString()
+              }));
+            } catch (e) { /* ignore */ }
+            return false;
+          };
+
+          // Collection is loaded synchronously here (it was mounted above), so try
+          // immediately; fall back to a short bounded poll if the tree is pending.
+          if (!revealActiveItemFolders(activeCollection)) {
+            const startedAt = Date.now();
+            const POLL_INTERVAL_MS = 100;
+            const POLL_LIMIT_MS = 2000;
+            const poll = () => {
+              const freshCollection = getState().collections?.collections?.find((c) => c.uid === collectionUid);
+              if (freshCollection && revealActiveItemFolders(freshCollection)) return;
+              if (Date.now() - startedAt < POLL_LIMIT_MS) {
+                setTimeout(poll, POLL_INTERVAL_MS);
+              }
+            };
+            setTimeout(poll, POLL_INTERVAL_MS);
+          }
         } else if (scratchCollection?.uid && !requestedWorkspaceTabType) {
           dispatch(addTab({ uid: `${scratchCollection.uid}-overview`, collectionUid: scratchCollection.uid, type: 'workspaceOverview' }));
         }
