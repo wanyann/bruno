@@ -10,7 +10,7 @@ import {
 } from '../workspaces';
 import { createCollection, openMultipleCollections, openScratchCollectionEvent, mountCollection, hydrateCollectionWithUiStateSnapshot } from '../collections/actions';
 import { removeCollection, addTransientDirectory, updateCollectionMountStatus, expandCollection, expandItem, sortCollections } from '../collections';
-import { findItemInCollection, getTreePathFromCollectionToItem } from 'utils/collections';
+import { findItemInCollection, findItemInCollectionByPathname, getTreePathFromCollectionToItem } from 'utils/collections';
 import { sanitizeName } from 'utils/common/regex';
 import { clearCollectionState } from '../openapi-sync';
 import { updateGlobalEnvironments } from '../global-environments';
@@ -546,17 +546,40 @@ export const hydrateSnapshotForOpenedCollection = (collectionPathname) => {
 
         // Reveal the active request by expanding every ancestor folder so the
         // restored tab is visible in the sidebar even when it lives in subfolders.
-        const activeItemUid = activeTab?.itemUid || activeTab?.uid;
-        if (activeItemUid) {
-          const activeItem = findItemInCollection(collection, activeItemUid);
-          if (activeItem) {
-            const treePath = getTreePathFromCollectionToItem(collection, activeItem);
+        // items load asynchronously during collection mount, so resolve the item via
+        // the live store and, if the tree isn't loaded yet, poll until it appears.
+        const revealActiveItemFolders = (targetCollection) => {
+          const activeItemUid = activeTab?.itemUid || activeTab?.uid;
+          let item = activeItemUid ? findItemInCollection(targetCollection, activeItemUid) : null;
+          if (!item && activeTab?.pathname) {
+            item = findItemInCollectionByPathname(targetCollection, activeTab.pathname);
+          }
+          if (item) {
+            const treePath = getTreePathFromCollectionToItem(targetCollection, item);
             (treePath || []).forEach((entry) => {
               if (entry && entry.type === 'folder' && entry.uid) {
-                dispatch(expandItem({ collectionUid: collection.uid, itemUid: entry.uid }));
+                dispatch(expandItem({ collectionUid: targetCollection.uid, itemUid: entry.uid }));
               }
             });
+            return true;
           }
+          return false;
+        };
+
+        if (!revealActiveItemFolders(collection)) {
+          // Tree not loaded yet — poll the store until it appears (bounded).
+          const collectionUid = collection.uid;
+          const startedAt = Date.now();
+          const POLL_INTERVAL_MS = 100;
+          const POLL_LIMIT_MS = 2000;
+          const poll = () => {
+            const freshCollection = getState().collections?.collections?.find((c) => c.uid === collectionUid);
+            if (freshCollection && revealActiveItemFolders(freshCollection)) return;
+            if (Date.now() - startedAt < POLL_LIMIT_MS) {
+              setTimeout(poll, POLL_INTERVAL_MS);
+            }
+          };
+          setTimeout(poll, POLL_INTERVAL_MS);
         }
       }
     }

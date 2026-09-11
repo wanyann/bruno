@@ -66,27 +66,19 @@ export const useInitialResponseFormat = (dataBuffer, headers) => {
     // Fall back to sniffing the body when the header content-type is missing/empty.
     // This covers responses returned as an array-header shape the header lookup
     // may not surface, while audio/image/pdfs keep their detected type above.
-    let fallbackSourcedFromBody = false;
     if (contentType === '' || contentType === undefined) {
       if (rawBodyText.startsWith('{') || rawBodyText.startsWith('[')) {
         contentType = 'application/json';
-        fallbackSourcedFromBody = true;
+      } else if (detectedContentType) {
+        // Binary detection (image/pdf/audio/video) takes priority.
+        contentType = detectedContentType;
       }
     }
 
-    console.log('[vp-format-dbg]', {
-      contentType,
-      detectedContentType,
-      fallbackSourcedFromBody,
-      bodyHead: rawBodyText.slice(0, 80),
-      headersType: Array.isArray(headers) ? 'array' : typeof headers,
-      headersKeys: Array.isArray(headers)
-        ? headers.map((h) => (h && (h.name ?? (Array.isArray(h) ? h[0] : null))))
-        : (headers && typeof headers === 'object' ? Object.keys(headers) : null)
-    });
-
-    // Wait until both content types are available
-    if (detectedContentType === null || contentType === undefined) {
+    // Wait only until we have some content type (header or body sniff). We do NOT
+    // wait for detectContentTypeFromBase64: it returns null for JSON/text bodies, so
+    // gating on it would leave the format as 'raw' even when the header says JSON.
+    if (!contentType) {
       return { initialFormat: null, initialTab: null, contentType: contentType };
     }
 
