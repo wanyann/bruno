@@ -73,7 +73,7 @@ const Devtools = ({ mainSectionRef }) => {
       <div
         onMouseDown={handleDevtoolsResizeStart}
         style={{
-          height: '12px',
+          height: '8px',
           cursor: 'row-resize',
           backgroundColor: isResizingDevtools ? dragHandleColor : 'transparent',
           transition: 'background-color 0.2s ease',

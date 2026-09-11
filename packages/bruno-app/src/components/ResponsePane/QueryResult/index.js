@@ -8,6 +8,16 @@ import QueryResultFilter from './QueryResultFilter';
 import QueryResultPreview from './QueryResultPreview';
 import StyledWrapper from './StyledWrapper';
 
+// Decode just enough of a base64 body to sniff its leading characters.
+const decodeTextHead = (base64) => {
+  try {
+    if (!base64 || typeof base64 !== 'string') return '';
+    return Buffer.from(base64, 'base64').toString('utf8').trimStart();
+  } catch (e) {
+    return '';
+  }
+};
+
 // Raw format options (for byte format types)
 const RAW_FORMAT_OPTIONS = [
   { id: 'raw', label: 'Raw', type: 'item', codeMirrorMode: 'text/plain' },
@@ -45,7 +55,18 @@ const formatErrorMessage = (error) => {
 export const useInitialResponseFormat = (dataBuffer, headers) => {
   return useMemo(() => {
     const detectedContentType = detectContentTypeFromBase64(dataBuffer);
-    const contentType = getContentType(headers);
+
+    let contentType = getContentType(headers);
+
+    // Fall back to sniffing the body when the header content-type is missing/empty.
+    // This covers responses returned as an array-header shape the header lookup
+    // may not surface, while audio/image/pdfs keep their detected type above.
+    if (contentType === '' || contentType === undefined) {
+      const bodyText = decodeTextHead(dataBuffer);
+      if (bodyText.startsWith('{') || bodyText.startsWith('[')) {
+        contentType = 'application/json';
+      }
+    }
 
     // Wait until both content types are available
     if (detectedContentType === null || contentType === undefined) {
