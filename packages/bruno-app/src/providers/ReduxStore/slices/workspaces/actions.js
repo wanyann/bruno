@@ -775,6 +775,14 @@ export const switchWorkspace = (workspaceUid) => {
                   args: ['[vp-tree-dbg]', {
                     path: activeTab?.pathname,
                     itemFound: true,
+                    itemType: item.type,
+                    itemName: item.name,
+                    itemUid: item.uid,
+                    treePath: (treePath || []).map((e) => ({
+                      type: e.type,
+                      name: e.name,
+                      uid: e.uid
+                    })),
                     foldersExpanded: expandedFds,
                     itemsCount: (targetCollection?.items || []).length
                   }],
