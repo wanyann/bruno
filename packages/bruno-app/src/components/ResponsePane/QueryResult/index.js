@@ -12,7 +12,11 @@ import StyledWrapper from './StyledWrapper';
 const decodeTextHead = (base64) => {
   try {
     if (!base64 || typeof base64 !== 'string') return '';
-    return Buffer.from(base64, 'base64').toString('utf8').trimStart();
+    // Decode a small head slice so huge base64 bodies stay cheap.
+    let slice = base64.slice(0, 4000).replace(/[^A-Za-z0-9+/=]/g, '');
+    const pad = (4 - (slice.length % 4)) % 4;
+    slice = slice + '='.repeat(pad);
+    return atob(slice).trimStart();
   } catch (e) {
     return '';
   }

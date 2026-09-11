@@ -86,7 +86,12 @@ export const normalizeFileName = (name) => {
 };
 
 export const getContentType = (headers) => {
-  // Return empty string for invalid headers
+  // Headers may come as a plain string (already a MIME type), an object, or an
+  // array of { name, value } / [key, value] pairs.
+  if (typeof headers === 'string') {
+    return headers.trim() || '';
+  }
+
   if (!headers || typeof headers !== 'object') {
     return '';
   }
@@ -94,8 +99,17 @@ export const getContentType = (headers) => {
   let contentType;
   if (Array.isArray(headers)) {
     // Headers as an array of { name, value } entries
-    const entry = headers.find((h) => h && String(h.name).toLowerCase() === 'content-type');
-    contentType = entry && entry.value;
+    const entry = headers.find((h) => {
+      const n = h
+        ? (h.name ?? h.header ?? (Array.isArray(h) ? h[0] : null))
+        : null;
+      return String(n).toLowerCase() === 'content-type';
+    });
+    if (Array.isArray(entry)) {
+      contentType = entry[1];
+    } else {
+      contentType = entry && (entry.value ?? entry[1]);
+    }
   } else if (Object.keys(headers).length > 0) {
     // Headers as a plain object keyed by name
     const contentTypeHeader = Object.entries(headers)
