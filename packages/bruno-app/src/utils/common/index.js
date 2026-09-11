@@ -87,15 +87,23 @@ export const normalizeFileName = (name) => {
 
 export const getContentType = (headers) => {
   // Return empty string for invalid headers
-  if (!headers || typeof headers !== 'object' || Object.keys(headers).length === 0) {
+  if (!headers || typeof headers !== 'object') {
     return '';
   }
 
-  // Get content-type header value
-  const contentTypeHeader = Object.entries(headers)
-    .find(([key]) => key.toLowerCase() === 'content-type');
-
-  const contentType = contentTypeHeader && contentTypeHeader[1];
+  let contentType;
+  if (Array.isArray(headers)) {
+    // Headers as an array of { name, value } entries
+    const entry = headers.find((h) => h && String(h.name).toLowerCase() === 'content-type');
+    contentType = entry && entry.value;
+  } else if (Object.keys(headers).length > 0) {
+    // Headers as a plain object keyed by name
+    const contentTypeHeader = Object.entries(headers)
+      .find(([key]) => key.toLowerCase() === 'content-type');
+    contentType = contentTypeHeader && contentTypeHeader[1];
+  } else {
+    return '';
+  }
 
   // Return empty string if no content-type or not a string
   if (!contentType || typeof contentType !== 'string') {

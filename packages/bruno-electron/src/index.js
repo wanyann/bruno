@@ -257,6 +257,23 @@ app.on('ready', async () => {
     mainWindow.maximize();
   }
 
+  // Route unexpected main-process errors (e.g. thrown inside async script callbacks
+  // such as setTimeout) to the in-app Console instead of the native
+  // "JavaScript error occurred in the main process" dialog.
+  const forwardErrorToConsole = (error) => {
+    const message = error && error.stack
+      ? error.stack
+      : (error && error.message ? error.message : String(error));
+    try {
+      console.error(message);
+    } catch (e) { /* ignore */ }
+    try {
+      mainWindow?.webContents?.send('main:console-log', { type: 'error', args: [message] });
+    } catch (e) { /* ignore */ }
+  };
+  process.on('uncaughtException', forwardErrorToConsole);
+  process.on('unhandledRejection', forwardErrorToConsole);
+
   ipcMain.on('renderer:window-minimize', () => {
     if (!isWindows && !isLinux) return;
     mainWindow.minimize();
