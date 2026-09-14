@@ -20,6 +20,58 @@ import { IconEye, IconEyeOff } from '@tabler/icons';
 
 const CodeMirror = require('codemirror');
 
+// ---------------------------------------------------------------------------
+// Module-level Cmd/Ctrl+Enter handling.
+// A single window CAPTURE-phase keydown listener (registered once at import
+// time, independent of any component lifecycle) claims Cmd/Ctrl+Enter before
+// CodeMirror's sublime keymap (insertLineAfter) and the global Mousetrap
+// sendRequest binding can react, then runs the currently focused editor's
+// onRun handler (e.g. "send request") exactly once. When no editor is focused
+// the event is left untouched, so the global sendRequest shortcut keeps
+// working from non-editor UI (tab headers etc.).
+// ---------------------------------------------------------------------------
+const shortcutActiveEditor = { current: null };
+
+const isCmdOrCtrlEnter = (e) =>
+  (e.key === 'Enter' || e.keyCode === 13)
+  && (e.metaKey || e.ctrlKey)
+  && !e.altKey
+  && !e.shiftKey;
+
+const shortcutLog = (label, extra = {}) => {
+  try {
+    console.log(label, extra);
+    store.dispatch(addLog({
+      type: 'log',
+      args: [label, extra],
+      timestamp: new Date().toISOString()
+    }));
+  } catch (err) { /* console/addLog must never break typing */ }
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', (e) => {
+    const active = document.activeElement;
+    const props = shortcutActiveEditor.current?.props || null;
+    const shortcut = isCmdOrCtrlEnter(e);
+    shortcutLog('[vp-shortcut]', {
+      type: shortcut ? 'shortcut' : 'key',
+      key: e.key,
+      metaKey: e.metaKey,
+      ctrlKey: e.ctrlKey,
+      activeOnRun: !!props?.onRun,
+      activeTag: active ? active.tagName : null
+    });
+    if (!shortcut) return;
+    if (props && props.onRun) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      shortcutLog('[vp-shortcut]', { action: 'run', uid: props.item?.uid });
+      props.onRun();
+    }
+  }, true);
+}
+
 /** Snapshot overflow ancestors so CM scroll/fold restore cannot shift the page. */
 const snapshotAncestorScrolls = (node) => {
   const snapshots = [];
@@ -131,13 +183,6 @@ class MultiLineEditor extends Component {
      * the newline insertion.
      */
     const runShortcut = () => {
-      try {
-        store.dispatch(addLog({
-          type: 'log',
-          args: ['[vp-run-dbg]', { onRunPresent: !!this.props.onRun, itemUid: this.props.item?.uid }],
-          timestamp: new Date().toISOString()
-        }));
-      } catch (e) { /* ignore */ }
       if (this.props.onRun) {
         this.props.onRun();
       }
@@ -238,35 +283,16 @@ class MultiLineEditor extends Component {
     });
     this._enableMaskedEditor(this.props.isSecret);
 
-    this._onCmdEnterCapture = (e) => {
-      const isEnter = e.key === 'Enter' || e.keyCode === 13;
-      const isShortcut = isEnter && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
-      if (!isShortcut) return;
-      const active = document.activeElement;
-      const focusedHere = !!(this.editorRef.current && active && this.editorRef.current.contains(active));
-      try {
-        store.dispatch(addLog({
-          type: 'log',
-          args: ['[vp-cap-dbg]', {
-            key: e.key,
-            metaKey: e.metaKey,
-            ctrlKey: e.ctrlKey,
-            focusedHere,
-            hasFocus: this.editor ? this.editor.hasFocus() : null,
-            activeTag: active ? active.tagName : null,
-            onRun: !!this.props.onRun,
-            uid: this.props.item?.uid
-          }],
-          timestamp: new Date().toISOString()
-        }));
-      } catch (_) {}
-      if (focusedHere && this.props.onRun) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        this.props.onRun();
+    // Track this editor as the "shortcut-active" one while it holds focus, so
+    // the module-level Cmd/Ctrl+Enter listener knows whose onRun to invoke.
+    this.editor.on('focus', () => {
+      shortcutActiveEditor.current = this;
+    });
+    this.editor.on('blur', () => {
+      if (shortcutActiveEditor.current === this) {
+        shortcutActiveEditor.current = null;
       }
-    };
-    document.addEventListener('keydown', this._onCmdEnterCapture, true);
+    });
   }
 
   _onBlur = () => {
@@ -385,8 +411,8 @@ class MultiLineEditor extends Component {
   }
 
   componentWillUnmount() {
-    if (this._onCmdEnterCapture) {
-      document.removeEventListener('keydown', this._onCmdEnterCapture, true);
+    if (shortcutActiveEditor.current === this) {
+      shortcutActiveEditor.current = null;
     }
     if (this.brunoAutoCompleteCleanup) {
       this.brunoAutoCompleteCleanup();
