@@ -237,6 +237,25 @@ class MultiLineEditor extends Component {
       this.props.onMaskChange?.(this.state.maskInput);
     });
     this._enableMaskedEditor(this.props.isSecret);
+
+    this._onCmdEnterCapture = (e) => {
+      const isEnter = e.key === 'Enter' || e.keyCode === 13;
+      if (isEnter && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+        try {
+          store.dispatch(addLog({
+            type: 'log',
+            args: ['[vp-cap-dbg]', { onRun: !!this.props.onRun, uid: this.props.item?.uid }],
+            timestamp: new Date().toISOString()
+          }));
+        } catch (_) {}
+        if (this.props.onRun) {
+          e.preventDefault();
+          e.stopPropagation();
+          this.props.onRun();
+        }
+      }
+    };
+    document.addEventListener('keydown', this._onCmdEnterCapture, true);
   }
 
   _onBlur = () => {
@@ -355,6 +374,9 @@ class MultiLineEditor extends Component {
   }
 
   componentWillUnmount() {
+    if (this._onCmdEnterCapture) {
+      document.removeEventListener('keydown', this._onCmdEnterCapture, true);
+    }
     if (this.brunoAutoCompleteCleanup) {
       this.brunoAutoCompleteCleanup();
     }
