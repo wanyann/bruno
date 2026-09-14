@@ -240,20 +240,30 @@ class MultiLineEditor extends Component {
 
     this._onCmdEnterCapture = (e) => {
       const isEnter = e.key === 'Enter' || e.keyCode === 13;
-      if (isEnter && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
-        if (!this.editor || !this.editor.hasFocus()) return;
-        try {
-          store.dispatch(addLog({
-            type: 'log',
-            args: ['[vp-cap-dbg]', { onRun: !!this.props.onRun, uid: this.props.item?.uid }],
-            timestamp: new Date().toISOString()
-          }));
-        } catch (_) {}
-        if (this.props.onRun) {
-          e.preventDefault();
-          e.stopPropagation();
-          this.props.onRun();
-        }
+      const isShortcut = isEnter && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
+      if (!isShortcut) return;
+      const active = document.activeElement;
+      const focusedHere = !!(this.editorRef.current && active && this.editorRef.current.contains(active));
+      try {
+        store.dispatch(addLog({
+          type: 'log',
+          args: ['[vp-cap-dbg]', {
+            key: e.key,
+            metaKey: e.metaKey,
+            ctrlKey: e.ctrlKey,
+            focusedHere,
+            hasFocus: this.editor ? this.editor.hasFocus() : null,
+            activeTag: active ? active.tagName : null,
+            onRun: !!this.props.onRun,
+            uid: this.props.item?.uid
+          }],
+          timestamp: new Date().toISOString()
+        }));
+      } catch (_) {}
+      if (focusedHere && this.props.onRun) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.props.onRun();
       }
     };
     document.addEventListener('keydown', this._onCmdEnterCapture, true);
