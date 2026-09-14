@@ -14,6 +14,8 @@ import {
 import StyledWrapper from './StyledWrapper';
 import { setupLinkAware } from 'utils/codemirror/linkAware';
 import { resolveLinkClickHandler } from 'utils/codemirror/linkClickHandler';
+import store from 'providers/ReduxStore';
+import { addLog } from 'providers/ReduxStore/slices/logs';
 import { IconEye, IconEyeOff } from '@tabler/icons';
 
 const CodeMirror = require('codemirror');
@@ -129,6 +131,13 @@ class MultiLineEditor extends Component {
      * the newline insertion.
      */
     const runShortcut = () => {
+      try {
+        store.dispatch(addLog({
+          type: 'log',
+          args: ['[vp-run-dbg]', { onRunPresent: !!this.props.onRun, itemUid: this.props.item?.uid }],
+          timestamp: new Date().toISOString()
+        }));
+      } catch (e) { /* ignore */ }
       if (this.props.onRun) {
         this.props.onRun();
       }
