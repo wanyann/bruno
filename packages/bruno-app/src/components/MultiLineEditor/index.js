@@ -241,6 +241,7 @@ class MultiLineEditor extends Component {
     this._onCmdEnterCapture = (e) => {
       const isEnter = e.key === 'Enter' || e.keyCode === 13;
       if (isEnter && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+        if (!this.editor || !this.editor.hasFocus()) return;
         try {
           store.dispatch(addLog({
             type: 'log',
