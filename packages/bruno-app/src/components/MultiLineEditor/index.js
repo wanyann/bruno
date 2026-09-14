@@ -30,15 +30,9 @@ const CodeMirror = require('codemirror');
 // the event is left untouched, so the global sendRequest shortcut keeps
 // working from non-editor UI (tab headers etc.).
 // ---------------------------------------------------------------------------
-const shortcutActiveEditor = { current: null };
+const mountedEditors = new Set();
 
-const isCmdOrCtrlEnter = (e) =>
-  (e.key === 'Enter' || e.keyCode === 13)
-  && (e.metaKey || e.ctrlKey)
-  && !e.altKey
-  && !e.shiftKey;
-
-const shortcutLog = (label, extra = {}) => {
+const activeEditorLog = (label, extra = {}) => {
   try {
     console.log(label, extra);
     store.dispatch(addLog({
@@ -49,26 +43,63 @@ const shortcutLog = (label, extra = {}) => {
   } catch (err) { /* console/addLog must never break typing */ }
 };
 
+/**
+ * Deterministically locate the mounted MultiLineEditor that currently owns
+ * focus, without relying on CodeMirror focus events. CodeMirror's input is a
+ * hidden <textarea> sitting inside the editor's wrapper element, so matching
+ * document.activeElement against every mounted wrapper is reliable.
+ */
+const findFocusedEditor = () => {
+  const active = document.activeElement;
+  if (!active) return null;
+  for (const instance of mountedEditors) {
+    const wrapper = instance.editor?.getWrapperElement?.();
+    if (wrapper && wrapper.contains(active)) {
+      return instance;
+    }
+  }
+  return null;
+};
+
+const isCmdOrCtrlEnter = (e) =>
+  (e.key === 'Enter' || e.keyCode === 13)
+  && (e.metaKey || e.ctrlKey)
+  && !e.altKey
+  && !e.shiftKey;
+
+/**
+ * Handle Cmd/Ctrl+Enter for a focused MultiLineEditor that provides onRun.
+ * Returns true when handled (event claimed), false otherwise.
+ */
+const handleShortcutForEditor = (e, instance) => {
+  if (!instance) return false;
+  const onRun = instance.props?.onRun;
+  if (typeof onRun !== 'function') return false;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  activeEditorLog('[vp-shortcut]', { action: 'run', uid: instance.props?.item?.uid });
+  onRun();
+  return true;
+};
+
 if (typeof window !== 'undefined') {
   window.addEventListener('keydown', (e) => {
     const active = document.activeElement;
-    const props = shortcutActiveEditor.current?.props || null;
     const shortcut = isCmdOrCtrlEnter(e);
-    shortcutLog('[vp-shortcut]', {
+    const focused = findFocusedEditor();
+    activeEditorLog('[vp-shortcut]', {
       type: shortcut ? 'shortcut' : 'key',
       key: e.key,
       metaKey: e.metaKey,
       ctrlKey: e.ctrlKey,
-      activeOnRun: !!props?.onRun,
-      activeTag: active ? active.tagName : null
+      activeTag: active ? active.tagName : null,
+      foundEditor: !!focused,
+      foundOnRun: typeof focused?.props?.onRun === 'function',
+      foundName: focused?.props?.name,
+      foundItemUid: focused?.props?.item?.uid
     });
     if (!shortcut) return;
-    if (props && props.onRun) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      shortcutLog('[vp-shortcut]', { action: 'run', uid: props.item?.uid });
-      props.onRun();
-    }
+    handleShortcutForEditor(e, focused);
   }, true);
 }
 
@@ -283,16 +314,9 @@ class MultiLineEditor extends Component {
     });
     this._enableMaskedEditor(this.props.isSecret);
 
-    // Track this editor as the "shortcut-active" one while it holds focus, so
-    // the module-level Cmd/Ctrl+Enter listener knows whose onRun to invoke.
-    this.editor.on('focus', () => {
-      shortcutActiveEditor.current = this;
-    });
-    this.editor.on('blur', () => {
-      if (shortcutActiveEditor.current === this) {
-        shortcutActiveEditor.current = null;
-      }
-    });
+    // Register for the module-level Cmd/Ctrl+Enter listener, so it can find
+    // this editor via its CodeMirror wrapper when this editor holds focus.
+    mountedEditors.add(this);
   }
 
   _onBlur = () => {
@@ -411,9 +435,7 @@ class MultiLineEditor extends Component {
   }
 
   componentWillUnmount() {
-    if (shortcutActiveEditor.current === this) {
-      shortcutActiveEditor.current = null;
-    }
+    mountedEditors.delete(this);
     if (this.brunoAutoCompleteCleanup) {
       this.brunoAutoCompleteCleanup();
     }
