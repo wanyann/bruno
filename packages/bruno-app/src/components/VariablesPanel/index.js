@@ -11,7 +11,7 @@ import {
   getVariablesUsedInRequest,
   getAllVariablesByScope
 } from 'utils/collections';
-import { updateVariableInScope, addToVariableScope, openCollectionSettings, sendRequest } from 'providers/ReduxStore/slices/collections/actions';
+import { updateVariableInScope, addToVariableScope, openCollectionSettings } from 'providers/ReduxStore/slices/collections/actions';
 import { addTab } from 'providers/ReduxStore/slices/tabs';
 import { setVariablesPanelOpen } from 'providers/ReduxStore/slices/app';
 import CollectionCreateEnvironment from 'components/Environments/EnvironmentSettings/CreateEnvironment';
@@ -117,37 +117,6 @@ const VariablesPanel = () => {
   useEffect(() => {
     setWidth(loadPersistedWidth());
   }, []);
-
-  // Cmd+Enter / Ctrl+Enter inside the panel (e.g. a focused value cell) sends
-  // the currently focused request. The global Mousetrap binding ignores
-  // textareas, so we capture the keydown explicitly at window level and only
-  // act when focus is actually inside this panel.
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const couldSend = !!hasRequestTab && !!item && !!activeCollection;
-    if (!couldSend) return;
-
-    const onCmdEnter = (e) => {
-      const isEnter = e.key === 'Enter' || e.keyCode === 13;
-      const isShortcut = isEnter && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
-      if (!isShortcut) return;
-
-      const active = document.activeElement;
-      if (!active || typeof active.closest !== 'function') return;
-      if (!active.closest('[data-testid="variables-panel"]')) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (item.requestState !== 'sending' && item.requestState !== 'queued') {
-        dispatch(sendRequest(item, activeCollection.uid)).catch(() => {});
-      }
-    };
-
-    window.addEventListener('keydown', onCmdEnter, true);
-    return () => window.removeEventListener('keydown', onCmdEnter, true);
-  }, [isOpen, hasRequestTab, item, activeCollection, dispatch]);
 
   // Build collection with global environment variables merged in (like RequestTabPanel)
   const collection = produce(_collections, (draft) => {

@@ -169,13 +169,18 @@ const VariableRow = ({
           ) : focused ? (
             <textarea
               ref={textareaRef}
-              className="vp-textarea"
+              className="vp-textarea mousetrap"
               rows={1}
               value={draft}
               readOnly={isReadOnly}
               placeholder="No value"
               onChange={handleTextareaChange}
               onBlur={handleTextareaBlur}
+              onKeyDown={(e) => {
+                if ((e.key === 'Enter' || e.keyCode === 13) && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+                  e.preventDefault();
+                }
+              }}
               spellCheck={false}
             />
           ) : (
