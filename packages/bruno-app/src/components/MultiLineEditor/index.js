@@ -14,94 +14,9 @@ import {
 import StyledWrapper from './StyledWrapper';
 import { setupLinkAware } from 'utils/codemirror/linkAware';
 import { resolveLinkClickHandler } from 'utils/codemirror/linkClickHandler';
-import store from 'providers/ReduxStore';
-import { addLog } from 'providers/ReduxStore/slices/logs';
 import { IconEye, IconEyeOff } from '@tabler/icons';
 
 const CodeMirror = require('codemirror');
-
-// ---------------------------------------------------------------------------
-// Module-level Cmd/Ctrl+Enter handling.
-// A single window CAPTURE-phase keydown listener (registered once at import
-// time, independent of any component lifecycle) claims Cmd/Ctrl+Enter before
-// CodeMirror's sublime keymap (insertLineAfter) and the global Mousetrap
-// sendRequest binding can react, then runs the currently focused editor's
-// onRun handler (e.g. "send request") exactly once. When no editor is focused
-// the event is left untouched, so the global sendRequest shortcut keeps
-// working from non-editor UI (tab headers etc.).
-// ---------------------------------------------------------------------------
-const mountedEditors = new Set();
-
-const activeEditorLog = (label, extra = {}) => {
-  try {
-    console.log(label, extra);
-    store.dispatch(addLog({
-      type: 'log',
-      args: [label, extra],
-      timestamp: new Date().toISOString()
-    }));
-  } catch (err) { /* console/addLog must never break typing */ }
-};
-
-/**
- * Deterministically locate the mounted MultiLineEditor that currently owns
- * focus, without relying on CodeMirror focus events. CodeMirror's input is a
- * hidden <textarea> sitting inside the editor's wrapper element, so matching
- * document.activeElement against every mounted wrapper is reliable.
- */
-const findFocusedEditor = () => {
-  const active = document.activeElement;
-  if (!active) return null;
-  for (const instance of mountedEditors) {
-    const wrapper = instance.editor?.getWrapperElement?.();
-    if (wrapper && wrapper.contains(active)) {
-      return instance;
-    }
-  }
-  return null;
-};
-
-const isCmdOrCtrlEnter = (e) =>
-  (e.key === 'Enter' || e.keyCode === 13)
-  && (e.metaKey || e.ctrlKey)
-  && !e.altKey
-  && !e.shiftKey;
-
-/**
- * Handle Cmd/Ctrl+Enter for a focused MultiLineEditor that provides onRun.
- * Returns true when handled (event claimed), false otherwise.
- */
-const handleShortcutForEditor = (e, instance) => {
-  if (!instance) return false;
-  const onRun = instance.props?.onRun;
-  if (typeof onRun !== 'function') return false;
-  e.preventDefault();
-  e.stopImmediatePropagation();
-  activeEditorLog('[vp-shortcut]', { action: 'run', uid: instance.props?.item?.uid });
-  onRun();
-  return true;
-};
-
-if (typeof window !== 'undefined') {
-  window.addEventListener('keydown', (e) => {
-    const active = document.activeElement;
-    const shortcut = isCmdOrCtrlEnter(e);
-    const focused = findFocusedEditor();
-    activeEditorLog('[vp-shortcut]', {
-      type: shortcut ? 'shortcut' : 'key',
-      key: e.key,
-      metaKey: e.metaKey,
-      ctrlKey: e.ctrlKey,
-      activeTag: active ? active.tagName : null,
-      foundEditor: !!focused,
-      foundOnRun: typeof focused?.props?.onRun === 'function',
-      foundName: focused?.props?.name,
-      foundItemUid: focused?.props?.item?.uid
-    });
-    if (!shortcut) return;
-    handleShortcutForEditor(e, focused);
-  }, true);
-}
 
 /** Snapshot overflow ancestors so CM scroll/fold restore cannot shift the page. */
 const snapshotAncestorScrolls = (node) => {
@@ -205,19 +120,15 @@ class MultiLineEditor extends Component {
     /** @type {import("codemirror").Editor} */
     const variables = getAllVariables(this.props.collection, this.props.item);
     /**
-     * Claim Cmd-Enter / Ctrl-Enter so CodeMirror's sublime keymap does NOT
-     * insert a newline (insertLineAfter). CodeMirror stops propagation for
-     * handled shortcut keys, which also prevents the global mousetrap
-     * sendRequest binding from firing — so when an onRun handler is provided
-     * (e.g. the Vars panel value cells), invoke it directly here. When onRun is
-     * absent (collection/folder-level editors) this remains a no-op to suppress
-     * the newline insertion.
+     * No-op. We claim Cmd-Enter / Ctrl-Enter here only to suppress CodeMirror's
+     * sublime keymap default (insertLineAfter), which would otherwise insert a
+     * newline. sendRequest dispatch is owned by Mousetrap — the editor input has
+     * the `mousetrap` class (added below) so the global
+     * useKeybinding('sendRequest', …) in RequestTabPanel handles it, and only
+     * in request tabs. Falling through with CodeMirror.Pass when onRun is absent
+     * would re-introduce the newline in collection/folder-level editors.
      */
-    const runShortcut = () => {
-      if (this.props.onRun) {
-        this.props.onRun();
-      }
-    };
+    const runShortcut = () => { };
     const enableFolding = !!this.props.enableFolding;
 
     this.editor = CodeMirror(this.editorRef.current, {
@@ -313,10 +224,6 @@ class MultiLineEditor extends Component {
       this.props.onMaskChange?.(this.state.maskInput);
     });
     this._enableMaskedEditor(this.props.isSecret);
-
-    // Register for the module-level Cmd/Ctrl+Enter listener, so it can find
-    // this editor via its CodeMirror wrapper when this editor holds focus.
-    mountedEditors.add(this);
   }
 
   _onBlur = () => {
@@ -435,7 +342,6 @@ class MultiLineEditor extends Component {
   }
 
   componentWillUnmount() {
-    mountedEditors.delete(this);
     if (this.brunoAutoCompleteCleanup) {
       this.brunoAutoCompleteCleanup();
     }
