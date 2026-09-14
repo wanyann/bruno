@@ -45,8 +45,8 @@ const StyledWrapper = styled.div`
     border-radius: 8px;
     box-shadow: ${(props) => props.theme.shadow.md};
     width: 90%;
-    max-width: 600px;
-    max-height: 70vh;
+    max-width: 720px;
+    max-height: 84vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -111,7 +111,7 @@ const StyledWrapper = styled.div`
   .command-k-results {
     flex: 1;
     overflow-y: auto;
-    max-height: 400px;
+    max-height: 480px;
     scrollbar-width: thin;
     padding: 6px 0;
     scroll-behavior: smooth;
@@ -271,6 +271,11 @@ const StyledWrapper = styled.div`
     background: ${(props) => rgba(props.theme.textLink, 0.1)};
     border: 1px solid ${(props) => rgba(props.theme.textLink, 0.2)};
     flex-shrink: 0;
+  }
+  .result-type.other {
+    color: ${(props) => props.theme.colors.text.muted};
+    background: ${(props) => rgba(props.theme.text, 0.08)};
+    border: 1px solid ${(props) => rgba(props.theme.text, 0.15)};
   }
   .result-item[data-type="documentation"] {
     .result-icon {

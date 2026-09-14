@@ -2,7 +2,8 @@ export const SEARCH_TYPES = {
   DOCUMENTATION: 'documentation',
   COLLECTION: 'collection',
   FOLDER: 'folder',
-  REQUEST: 'request'
+  REQUEST: 'request',
+  OTHER: 'other'
 };
 
 export const MATCH_TYPES = {
@@ -11,7 +12,8 @@ export const MATCH_TYPES = {
   REQUEST: 'request',
   URL: 'url',
   PATH: 'path',
-  DOCUMENTATION: 'documentation'
+  DOCUMENTATION: 'documentation',
+  OTHER: 'other'
 };
 
 export const SEARCH_CONFIG = {

@@ -102,12 +102,14 @@ export const tabsSlice = createSlice({
       const existingTab = find(state.tabs, (tab) => tab.uid === uid);
       if (existingTab) {
         state.activeTabUid = ensureTabUid(existingTab);
+        existingTab.lastUsedAt = Date.now();
         return;
       }
 
       const existingPathnameTab = findTabByPathname(state.tabs, { collectionUid, pathname, type, exampleName, exampleIndex });
       if (existingPathnameTab) {
         state.activeTabUid = ensureTabUid(existingPathnameTab);
+        existingPathnameTab.lastUsedAt = Date.now();
         return;
       }
 
@@ -125,6 +127,7 @@ export const tabsSlice = createSlice({
 
         if (existingTab) {
           state.activeTabUid = ensureTabUid(existingTab);
+          existingTab.lastUsedAt = Date.now();
           return;
         }
       }
@@ -156,6 +159,7 @@ export const tabsSlice = createSlice({
           responseViewTab: null,
           scriptPaneTab: null,
           variablesPanelOpen: false,
+          lastUsedAt: Date.now(),
           preview: preview !== undefined
             ? preview
             : !nonReplaceableTabTypes.includes(type),
@@ -197,6 +201,7 @@ export const tabsSlice = createSlice({
         scriptPaneTab: null,
         variablesPanelOpen: false,
         docsEditing: false,
+        lastUsedAt: Date.now(),
         ...(uid ? { folderUid: uid } : {}),
         preview: preview !== undefined
           ? preview
@@ -215,8 +220,9 @@ export const tabsSlice = createSlice({
     },
     focusTab: (state, action) => {
       const { uid } = action.payload;
-      const tabExists = state.tabs.some((t) => t.uid === uid);
-      if (tabExists) {
+      const tabToFocus = find(state.tabs, (t) => t.uid === uid);
+      if (tabToFocus) {
+        tabToFocus.lastUsedAt = Date.now();
         state.activeTabUid = uid;
       }
     },
@@ -641,6 +647,7 @@ export const tabsSlice = createSlice({
 
       state.tabs.push(tab);
       state.activeTabUid = tab.uid;
+      tab.lastUsedAt = Date.now();
     }
   }
 });

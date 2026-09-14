@@ -6,13 +6,20 @@ import {
   IconFolder,
   IconBox,
   IconFileText,
-  IconBook
+  IconBook,
+  IconDots
 } from '@tabler/icons';
-import { flattenItems, isItemARequest, isItemAFolder, findParentItemInCollection } from 'utils/collections';
+import {
+  flattenItems,
+  isItemARequest,
+  isItemAFolder,
+  findParentItemInCollection,
+  findItemInCollectionByItemUid,
+  getDefaultRequestPaneTab
+} from 'utils/collections';
 import { addTab, focusTab } from 'providers/ReduxStore/slices/tabs';
 import { toggleCollectionItem, toggleCollection } from 'providers/ReduxStore/slices/collections';
 import { mountCollection } from 'providers/ReduxStore/slices/collections/actions';
-import { getDefaultRequestPaneTab } from 'utils/collections';
 import { normalizePath } from 'utils/common/path';
 import { normalizeQuery, isValidQuery, highlightText, sortResults, getTypeLabel, getItemPath } from './utils/searchUtils';
 import { SEARCH_TYPES, MATCH_TYPES, SEARCH_CONFIG, DOCUMENTATION_RESULT } from './constants';
@@ -30,6 +37,8 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
   const allCollections = useSelector((state) => state.collections.collections);
   const { workspaces, activeWorkspaceUid } = useSelector((state) => state.workspaces);
   const tabs = useSelector((state) => state.tabs.tabs);
+  const recentlyClosedTabs = useSelector((state) => state.tabs.recentlyClosedTabs || []);
+  const activeTabUid = useSelector((state) => state.tabs.activeTabUid);
 
   const activeWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
 
@@ -42,18 +51,70 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     return allCollections.filter((c) => workspacePaths.has(normalizePath(c.pathname)));
   }, [activeWorkspace, allCollections, workspaces]);
 
-  const createCollectionResults = () => {
-    const collectionResults = collections.map((collection) => ({
-      type: SEARCH_TYPES.COLLECTION,
-      item: collection,
-      name: collection.name,
-      path: collection.name,
-      matchType: MATCH_TYPES.COLLECTION,
-      collectionUid: collection.uid
-    }));
+  const REQUEST_TAB_TYPES = ['request', 'http-request', 'grpc-request', 'ws-request', 'graphql-request'];
 
-    collectionResults.sort((a, b) => a.name.localeCompare(b.name));
-    return [DOCUMENTATION_RESULT, ...collectionResults];
+  const isRequestTabType = (type) => REQUEST_TAB_TYPES.includes(type);
+
+  // Resolve a tab into a result item shaped like search results so it can be
+  // rendered with the exact same markup (name, url/method, type badge).
+  const tabToResult = (tab, tabCollection) => {
+    if (isRequestTabType(tab.type)) {
+      const item = findItemInCollectionByItemUid(tabCollection, tab.uid);
+      if (item && isItemARequest(item)) {
+        const isGrpcRequest = item.request?.type === 'grpc';
+        let method = item.request?.method || '';
+        if (isGrpcRequest) {
+          const methodType = item.request?.methodType || 'UNARY';
+          method = methodType.toLowerCase().replace(/[_]/g, '-');
+        }
+
+        return {
+          type: SEARCH_TYPES.REQUEST,
+          item,
+          name: item.name,
+          path: getItemPath(item, tabCollection, findParentItemInCollection),
+          matchType: MATCH_TYPES.REQUEST,
+          method,
+          collectionUid: tab.collectionUid
+        };
+      }
+    }
+
+    const name = tab.tabName || tab.name || tab.responseName || tabCollection?.name || tab.type;
+    return {
+      type: SEARCH_TYPES.OTHER,
+      item: tab,
+      name,
+      path: tabCollection?.name || '',
+      description: tab.description,
+      matchType: MATCH_TYPES.OTHER,
+      collectionUid: tab.collectionUid
+    };
+  };
+
+  const createRecentTabsResults = () => {
+    const collectionByUid = new Map(collections.map((c) => [c.uid, c]));
+    const visibleCollectionUids = new Set(collections.map((c) => c.uid));
+
+    // Open tabs + recently closed tabs, within the active workspace, excluding the
+    // currently active tab, sorted by most recently used (newest first).
+    const candidates = [...tabs, ...recentlyClosedTabs]
+      .filter((tab) => tab && tab.uid !== activeTabUid && visibleCollectionUids.has(tab.collectionUid));
+
+    candidates.sort((a, b) => {
+      const aTime = a.lastUsedAt || 0;
+      const bTime = b.lastUsedAt || 0;
+      return bTime - aTime;
+    });
+
+    const results = [];
+    for (const tab of candidates.slice(0, 8)) {
+      const collection = collectionByUid.get(tab.collectionUid);
+      if (!collection) continue;
+      results.push(tabToResult(tab, collection));
+    }
+
+    return results;
   };
 
   const searchInCollections = (searchTerms, enablePathMatch) => {
@@ -137,7 +198,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     const normalizedQuery = normalizeQuery(searchQuery);
 
     if (!normalizedQuery) {
-      setResults(createCollectionResults());
+      setResults(createRecentTabsResults());
       return;
     }
 
@@ -255,7 +316,9 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
       return;
     }
 
-    expandItemPath(result);
+    if (result.type === SEARCH_TYPES.REQUEST || result.type === SEARCH_TYPES.FOLDER) {
+      expandItemPath(result);
+    }
 
     if (result.type === SEARCH_TYPES.REQUEST) {
       const existingTab = tabs.find((tab) => tab.uid === result.item.uid);
@@ -284,6 +347,25 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
         collectionUid: result.collectionUid,
         type: 'collection-settings'
       }));
+    } else if (result.type === SEARCH_TYPES.OTHER) {
+      const tab = result.item;
+      if (tab && tab.uid) {
+        const existingTab = tabs.find((t) => t.uid === tab.uid);
+        if (existingTab) {
+          dispatch(focusTab({ uid: tab.uid }));
+        } else {
+          dispatch(addTab({
+            uid: tab.uid,
+            collectionUid: tab.collectionUid,
+            type: tab.type,
+            pathname: tab.pathname,
+            exampleName: tab.exampleName,
+            exampleIndex: tab.exampleIndex,
+            mockServerUid: tab.mockServerUid,
+            tabName: tab.tabName
+          }));
+        }
+      }
     }
 
     onClose();
@@ -353,7 +435,8 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
       [SEARCH_TYPES.DOCUMENTATION]: IconBook,
       [SEARCH_TYPES.COLLECTION]: IconBox,
       [SEARCH_TYPES.FOLDER]: IconFolder,
-      [SEARCH_TYPES.REQUEST]: IconFileText
+      [SEARCH_TYPES.REQUEST]: IconFileText,
+      [SEARCH_TYPES.OTHER]: IconDots
     };
     const IconComponent = iconMap[type] || IconFileText;
     return <IconComponent size={18} stroke={1.5} />;
@@ -477,7 +560,9 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
                             ? result.description
                             : result.type === SEARCH_TYPES.REQUEST
                               ? highlightText(result.item.request?.url || '', query)
-                              : highlightText(result.path, query)}
+                              : result.description
+                                ? highlightText(result.description, query)
+                                : highlightText(result.path, query)}
                         </div>
                       </div>
                       <div className="result-badges">
@@ -490,7 +575,10 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
                           </span>
                         )}
                         {typeLabel && (
-                          <div className="result-type" aria-label={`Item type ${typeLabel}`}>
+                          <div
+                            className={`result-type ${result.type === SEARCH_TYPES.OTHER ? 'other' : ''}`}
+                            aria-label={`Item type ${typeLabel}`}
+                          >
                             {typeLabel}
                           </div>
                         )}
