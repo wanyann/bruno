@@ -147,15 +147,108 @@ const StyledWrapper = styled.div`
       background: ${(props) => props.theme.dropdown.hoverBg};
     }
   }
-  .result-icon {
+  .result-method {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    flex-shrink: 0;
+    min-width: 42px;
+    width: 42px;
+  }
+  .method-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    min-height: 18px;
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
     flex-shrink: 0;
     color: ${(props) => props.theme.colors.text.muted};
-    opacity: 0.8;
+    background: ${(props) => rgba(props.theme.text, 0.1)};
+    border: 1px solid ${(props) => rgba(props.theme.text, 0.15)};
+    &.get {
+      color: ${(props) => props.theme.request.methods.get};
+      background: ${(props) => rgba(props.theme.request.methods.get, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.get, 0.2)};
+    }
+    &.post {
+      color: ${(props) => props.theme.request.methods.post};
+      background: ${(props) => rgba(props.theme.request.methods.post, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.post, 0.2)};
+    }
+    &.put {
+      color: ${(props) => props.theme.request.methods.put};
+      background: ${(props) => rgba(props.theme.request.methods.put, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.put, 0.2)};
+    }
+    &.delete {
+      color: ${(props) => props.theme.request.methods.delete};
+      background: ${(props) => rgba(props.theme.request.methods.delete, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.delete, 0.2)};
+    }
+    &.patch {
+      color: ${(props) => props.theme.request.methods.patch};
+      background: ${(props) => rgba(props.theme.request.methods.patch, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.patch, 0.2)};
+    }
+    &.head {
+      color: ${(props) => props.theme.request.methods.head};
+      background: ${(props) => rgba(props.theme.request.methods.head, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.head, 0.2)};
+    }
+    &.options {
+      color: ${(props) => props.theme.request.methods.options};
+      background: ${(props) => rgba(props.theme.request.methods.options, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.options, 0.2)};
+    }
+    &.trace {
+      color: ${(props) => props.theme.request.methods.get};
+      background: ${(props) => rgba(props.theme.request.methods.get, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.get, 0.2)};
+    }
+    &.connect {
+      color: ${(props) => props.theme.request.methods.post};
+      background: ${(props) => rgba(props.theme.request.methods.post, 0.1)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.post, 0.2)};
+    }
+    &.unary {
+      color: ${(props) => props.theme.request.methods.get};
+      background: ${(props) => rgba(props.theme.request.methods.get, 0.12)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.get, 0.2)};
+    }
+    &.client-streaming {
+      color: ${(props) => props.theme.request.methods.post};
+      background: ${(props) => rgba(props.theme.request.methods.post, 0.12)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.post, 0.2)};
+    }
+    &.server-streaming {
+      color: ${(props) => props.theme.request.methods.put};
+      background: ${(props) => rgba(props.theme.request.methods.put, 0.12)};
+      border: 1px solid ${(props) => rgba(props.theme.request.methods.put, 0.2)};
+    }
+    &.bidi-streaming,
+    &.bidirectional-streaming {
+      color: ${(props) => props.theme.colors.text.purple};
+      background: ${(props) => rgba(props.theme.colors.text.purple, 0.12)};
+      border: 1px solid ${(props) => rgba(props.theme.colors.text.purple, 0.2)};
+    }
+  }
+  .type-icon-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 24px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    color: #ffffff;
+    background: ${(props) => props.theme.brand};
+    border: 1px solid ${(props) => rgba(props.theme.brand, 0.2)};
   }
   .result-content {
     flex: 1;
@@ -193,73 +286,6 @@ const StyledWrapper = styled.div`
     text-overflow: ellipsis;
     letter-spacing: 0.1px;
   }
-  .method-badge {
-    font-size: 0.625rem;
-    font-weight: 500;
-    padding: 2px 6px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    flex-shrink: 0;
-    min-width: 48px;
-    text-align: center;
-    &.get {
-      color: ${(props) => props.theme.request.methods.get};
-      background: ${(props) => rgba(props.theme.request.methods.get, 0.1)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.get, 0.2)};
-    }
-    &.post {
-      color: ${(props) => props.theme.request.methods.post};
-      background: ${(props) => rgba(props.theme.request.methods.post, 0.1)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.post, 0.2)};
-    }
-    &.put {
-      color: ${(props) => props.theme.request.methods.put};
-      background: ${(props) => rgba(props.theme.request.methods.put, 0.1)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.put, 0.2)};
-    }
-    &.delete {
-      color: ${(props) => props.theme.request.methods.delete};
-      background: ${(props) => rgba(props.theme.request.methods.delete, 0.1)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.delete, 0.2)};
-    }
-    &.patch {
-      color: ${(props) => props.theme.request.methods.patch};
-      background: ${(props) => rgba(props.theme.request.methods.patch, 0.1)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.patch, 0.2)};
-    }
-    &.head {
-      color: ${(props) => props.theme.request.methods.head};
-      background: ${(props) => rgba(props.theme.request.methods.head, 0.1)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.head, 0.2)};
-    }
-    &.options {
-      color: ${(props) => props.theme.request.methods.options};
-      background: ${(props) => rgba(props.theme.request.methods.options, 0.1)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.options, 0.2)};
-    }
-    &.unary {
-      color: ${(props) => props.theme.request.methods.get};
-      background: ${(props) => rgba(props.theme.request.methods.get, 0.12)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.get, 0.2)};
-    }
-    &.client-streaming {
-      color: ${(props) => props.theme.request.methods.post};
-      background: ${(props) => rgba(props.theme.request.methods.post, 0.12)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.post, 0.2)};
-    }
-    &.server-streaming {
-      color: ${(props) => props.theme.request.methods.put};
-      background: ${(props) => rgba(props.theme.request.methods.put, 0.12)};
-      border: 1px solid ${(props) => rgba(props.theme.request.methods.put, 0.2)};
-    }
-    &.bidirectional-streaming,
-    &.bidi-streaming {
-      color: ${(props) => props.theme.colors.text.purple};
-      background: ${(props) => rgba(props.theme.colors.text.purple, 0.12)};
-      border: 1px solid ${(props) => rgba(props.theme.colors.text.purple, 0.2)};
-    }
-  }
   .result-type {
     font-size: 0.625rem;
     color: ${(props) => props.theme.textLink};
@@ -273,10 +299,6 @@ const StyledWrapper = styled.div`
     flex-shrink: 0;
   }
   .result-item[data-type="documentation"] {
-    .result-icon {
-      color: ${(props) => props.theme.colors.text.muted};
-      opacity: 0.8;
-    }
     .result-path {
       font-size: ${(props) => props.theme.font.size.sm};
       color: ${(props) => props.theme.colors.text.muted};

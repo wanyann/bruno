@@ -393,6 +393,24 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     };
   }, []);
 
+  // Shorten HTTP/gRPC method names to fit the fixed-size (5ch) method tag.
+  const methodShortLabel = (method) => {
+    if (!method) return '';
+    const upper = method.toUpperCase().replace(/-/g, '');
+    const map = {
+      DELETE: 'DEL',
+      OPTIONS: 'OPT',
+      CONNECT: 'CONN',
+      PATCH: 'PTCH',
+      TRACE: 'TRAC',
+      CLIENTSTREAMING: 'CLNT',
+      SERVERSTREAMING: 'SRVR',
+      BIDISTREAMING: 'BIDI',
+      UNARY: 'UNARY'
+    };
+    return map[upper] || upper;
+  };
+
   const getResultIcon = (type) => {
     const iconMap = {
       [SEARCH_TYPES.DOCUMENTATION]: IconBook,
@@ -496,6 +514,24 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
                 const isSelected = index === selectedIndex;
                 const typeLabel = getTypeLabel(result.type);
 
+                let resultLeft = null;
+                if (result.type === SEARCH_TYPES.REQUEST && result.method) {
+                  resultLeft = (
+                    <span
+                      className={`method-tag ${result.method.toLowerCase()}`}
+                      aria-label={`HTTP method ${result.method.toUpperCase().replace(/-/g, ' ')}`}
+                    >
+                      {methodShortLabel(result.method)}
+                    </span>
+                  );
+                } else if (typeLabel) {
+                  resultLeft = (
+                    <span className={`type-icon-tag ${result.type}`} aria-label={`Item type ${typeLabel}`}>
+                      {getResultIcon(result.type)}
+                    </span>
+                  );
+                }
+
                 return (
                   <div
                     key={`${result.type}-${result.item.id || result.item.uid}-${index}`}
@@ -509,8 +545,8 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
                     aria-label={`${result.name}, ${typeLabel || result.type}${result.method ? `, ${result.method}` : ''}`}
                     tabIndex={-1}
                   >
-                    <div className="result-icon">
-                      {getResultIcon(result.type)}
+                    <div className="result-method">
+                      {resultLeft}
                     </div>
                     <div className="result-content">
                       <div className="result-info">
@@ -522,21 +558,6 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
                             ? result.description
                             : highlightText(result.item.request?.url || '', query)}
                         </div>
-                      </div>
-                      <div className="result-badges">
-                        {result.type === SEARCH_TYPES.REQUEST && result.method && (
-                          <span
-                            className={`method-badge ${result.method.toLowerCase()}`}
-                            aria-label={`HTTP method ${result.method.toUpperCase().replace(/-/g, ' ')}`}
-                          >
-                            {result.method.toUpperCase().replace(/-/g, ' ')}
-                          </span>
-                        )}
-                        {typeLabel && (
-                          <div className="result-type" aria-label={`Item type ${typeLabel}`}>
-                            {typeLabel}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
