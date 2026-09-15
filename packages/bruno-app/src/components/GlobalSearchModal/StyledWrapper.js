@@ -272,11 +272,6 @@ const StyledWrapper = styled.div`
     border: 1px solid ${(props) => rgba(props.theme.textLink, 0.2)};
     flex-shrink: 0;
   }
-  .result-type.other {
-    color: ${(props) => props.theme.colors.text.muted};
-    background: ${(props) => rgba(props.theme.text, 0.08)};
-    border: 1px solid ${(props) => rgba(props.theme.text, 0.15)};
-  }
   .result-item[data-type="documentation"] {
     .result-icon {
       color: ${(props) => props.theme.colors.text.muted};

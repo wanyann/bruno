@@ -8,6 +8,11 @@ import { isActiveTab as checkIsActiveTab, deserializeTab } from 'utils/snapshot'
 // todo: errors should be tracked in each slice and displayed as toasts
 
 const MAX_RECENTLY_CLOSED_TABS = 50;
+const MAX_RECENT_REQUESTS = 50;
+
+export const REQUEST_TAB_TYPES = ['request', 'http-request', 'grpc-request', 'ws-request', 'graphql-request'];
+
+export const isRequestTabType = (type) => REQUEST_TAB_TYPES.includes(type);
 
 export const NON_CLOSABLE_TAB_TYPES = ['workspaceOverview', 'workspaceEnvironments'];
 
@@ -21,7 +26,8 @@ const ensureTabUid = (tab) => {
 const initialState = {
   tabs: [],
   activeTabUid: null,
-  recentlyClosedTabs: [] // LIFO stack of closed tabs, grouped by collection
+  recentlyClosedTabs: [], // LIFO stack of closed tabs, grouped by collection
+  recentRequests: [] // most recently opened requests, newest first
 };
 
 const normalizeMockTabType = (type) => (
@@ -62,6 +68,19 @@ const findTabByPathname = (tabs, { collectionUid, pathname, type, exampleName, e
   });
 };
 
+// Tracks the most recently opened requests (by request item uid), independent of
+// tabs (a single tab may be reused for several requests). Newest first.
+const registerRecentRequest = (state, itemUid, collectionUid) => {
+  if (!itemUid) return;
+  if (collectionUid) {
+    state.recentRequests = state.recentRequests.filter((r) => r.uid !== itemUid);
+    state.recentRequests.unshift({ uid: itemUid, collectionUid });
+  }
+  if (state.recentRequests.length > MAX_RECENT_REQUESTS) {
+    state.recentRequests = state.recentRequests.slice(0, MAX_RECENT_REQUESTS);
+  }
+};
+
 export const tabsSlice = createSlice({
   name: 'tabs',
   initialState,
@@ -84,6 +103,13 @@ export const tabsSlice = createSlice({
         responseName,
         openInEditMode
       } = action.payload;
+
+      // Track every request open (a single tab may be reused for several
+      // requests), independent of the tab itself. For request tabs, the item's
+      // uid is passed as `uid`.
+      if (isRequestTabType(type || '') && uid) {
+        registerRecentRequest(state, uid, collectionUid);
+      }
 
       const nonReplaceableTabTypes = [
         'variables',
@@ -223,6 +249,9 @@ export const tabsSlice = createSlice({
       const tabToFocus = find(state.tabs, (t) => t.uid === uid);
       if (tabToFocus) {
         tabToFocus.lastUsedAt = Date.now();
+        if (isRequestTabType(tabToFocus.type) && uid) {
+          registerRecentRequest(state, uid, tabToFocus.collectionUid);
+        }
         state.activeTabUid = uid;
       }
     },

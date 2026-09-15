@@ -66,8 +66,7 @@ export const getTypeLabel = (type) => {
   const baseLabels = {
     [SEARCH_TYPES.DOCUMENTATION]: 'Documentation',
     [SEARCH_TYPES.COLLECTION]: 'Collection',
-    [SEARCH_TYPES.FOLDER]: 'Folder',
-    [SEARCH_TYPES.OTHER]: 'Other'
+    [SEARCH_TYPES.FOLDER]: 'Folder'
   };
 
   return baseLabels[type] || '';
