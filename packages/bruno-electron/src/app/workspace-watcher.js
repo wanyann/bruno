@@ -4,7 +4,9 @@ const path = require('path');
 const chokidar = require('chokidar');
 const yaml = require('js-yaml');
 const { generateUidBasedOnHash, uuid } = require('../utils/common');
-const { getWorkspaceUid, normalizeWorkspaceConfig } = require('../utils/workspace-config');
+const { getWorkspaceUid, normalizeWorkspaceConfig, getWorkspaceCollections } = require('../utils/workspace-config');
+const { hasRequestExtension } = require('../utils/filesystem');
+const { getSearchIndex } = require('../services/search/search-index');
 const { parseEnvironment } = require('@usebruno/filestore');
 const { parseValueByDataType } = require('@usebruno/common/utils');
 const EnvironmentSecretsStore = require('../store/env-secrets');
@@ -153,6 +155,7 @@ class WorkspaceWatcher {
     this.watchers = {};
     this.environmentWatchers = {};
     this.mockServerWatchers = {};
+    this.searchWatchers = {};
   }
 
   _closeMockServerWatcher(workspacePath) {
@@ -210,6 +213,63 @@ class WorkspaceWatcher {
     this.mockServerWatchers[workspacePath] = mockServerWatcher;
   }
 
+  _closeSearchWatcher(workspacePath) {
+    if (this.searchWatchers[workspacePath]) {
+      this.searchWatchers[workspacePath].close();
+      delete this.searchWatchers[workspacePath];
+    }
+  }
+
+  // Watch every file in the workspace folder so the global search index stays
+  // fresh even for collections that are not mounted. Changes to request files
+  // mark the owning collection's search index stale for background rebuild.
+  _addSearchWatcher(win, workspacePath) {
+    this._closeSearchWatcher(workspacePath);
+
+    if (!fs.existsSync(workspacePath)) {
+      return;
+    }
+
+    let collectionPaths = [];
+    try {
+      collectionPaths = getWorkspaceCollections(workspacePath).map((c) => c.path);
+    } catch (err) {
+      console.error('Error resolving workspace collections for search index:', err);
+    }
+
+    const watcher = chokidar.watch(workspacePath, {
+      ignoreInitial: true,
+      persistent: true,
+      ignorePermissionErrors: true,
+      awaitWriteFinish: {
+        stabilityThreshold: 100,
+        pollInterval: 10
+      },
+      ignored: (filePath) => {
+        if (/[\\/]node_modules[\\/]/.test(filePath)) return true;
+        if (/[\\/]\.git[\\/]/.test(filePath)) return true;
+        if (path.basename(filePath) === '.DS_Store') return true;
+        return false;
+      }
+    });
+
+    const onFileChange = (filePath) => {
+      if (!hasRequestExtension(filePath)) return;
+      const collectionPath = collectionPaths.find((cp) => filePath.startsWith(cp + path.sep));
+      if (collectionPath) {
+        getSearchIndex().markStale(collectionPath);
+      }
+    };
+
+    watcher.on('add', onFileChange);
+    watcher.on('change', onFileChange);
+    watcher.on('unlink', onFileChange);
+    watcher.on('addDir', onFileChange);
+    watcher.on('unlinkDir', onFileChange);
+
+    this.searchWatchers[workspacePath] = watcher;
+  }
+
   addWatcher(win, workspacePath) {
     const workspaceFilePath = path.join(workspacePath, 'workspace.yml');
     const environmentsDir = path.join(workspacePath, 'environments');
@@ -222,6 +282,8 @@ class WorkspaceWatcher {
       this.environmentWatchers[workspacePath].close();
     }
     this._closeMockServerWatcher(workspacePath);
+
+    this._addSearchWatcher(win, workspacePath);
 
     const self = this;
     setTimeout(() => {
@@ -299,6 +361,7 @@ class WorkspaceWatcher {
         delete this.environmentWatchers[workspacePath];
       }
       this._closeMockServerWatcher(workspacePath);
+      this._closeSearchWatcher(workspacePath);
       dotEnvWatcher.removeWorkspaceWatcher(workspacePath);
     } catch (error) {
       console.error('Error removing workspace watcher:', error);
@@ -326,6 +389,10 @@ class WorkspaceWatcher {
 
     for (const workspacePath of Object.keys(this.mockServerWatchers)) {
       this._closeMockServerWatcher(workspacePath);
+    }
+
+    for (const workspacePath of Object.keys(this.searchWatchers)) {
+      this._closeSearchWatcher(workspacePath);
     }
 
     const dotEnvResult = dotEnvWatcher.closeAll();

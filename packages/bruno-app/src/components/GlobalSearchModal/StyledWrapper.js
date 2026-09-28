@@ -316,6 +316,56 @@ const StyledWrapper = styled.div`
     color: ${(props) => props.theme.colors.text.muted};
     font-size: ${(props) => props.theme.font.size.base};
   }
+  .skeleton-list {
+    padding: 0;
+  }
+  .skeleton-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    margin: 2px 8px;
+    gap: 10px;
+  }
+  .skeleton-method {
+    flex-shrink: 0;
+    width: 42px;
+    height: 20px;
+    border-radius: 4px;
+    background: ${(props) => rgba(props.theme.text, 0.08)};
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+  .skeleton-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: ${(props) => props.theme.font.size.base};
+  }
+  .skeleton-line {
+    border-radius: 4px;
+    background: ${(props) => rgba(props.theme.text, 0.08)};
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+  .skeleton-line-name {
+    width: 45%;
+    height: 1.5em;
+  }
+  .skeleton-line-path {
+    width: 75%;
+    height: 1.5em;
+    font-size: ${(props) => props.theme.font.size.sm};
+    animation-delay: 0.2s;
+  }
+  @keyframes skeleton-shimmer {
+    0%,
+    100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
   .command-k-footer {
     padding: 8px 12px;
     border-top: 1px solid ${(props) => props.theme.border.border1};

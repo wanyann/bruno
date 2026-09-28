@@ -110,6 +110,7 @@ class SingleLineEditor extends Component {
 
     this.editor.setValue(String(this.props.value ?? ''));
     this.editor.on('change', this._onEdit);
+    this.editor.on('beforeChange', this._onBeforeChange);
     this.editor.on('paste', this._onPaste);
     this.editor.on('blur', this._onBlur);
     this.addOverlay(variables);
@@ -165,6 +166,20 @@ class SingleLineEditor extends Component {
   };
 
   _onPaste = (_, event) => this.props.onPaste?.(event);
+
+  // Strip trailing line breaks from pasted text (they are usually an artifact
+  // of copying from another app). Interior newlines are preserved.
+  _onBeforeChange = (_instance, change) => {
+    if (change.origin !== 'paste') return;
+    const lines = change.text;
+    let end = lines.length;
+    while (end > 1 && lines[end - 1] === '') {
+      end -= 1;
+    }
+    if (end < lines.length) {
+      change.update(change.from, change.to, lines.slice(0, end));
+    }
+  };
 
   componentDidUpdate(prevProps) {
     // Ensure the changes caused by this update are not interpreted as
@@ -254,6 +269,7 @@ class SingleLineEditor extends Component {
         this.editor._destroyLinkAware();
       }
       this.editor.off('change', this._onEdit);
+      this.editor.off('beforeChange', this._onBeforeChange);
       this.editor.off('paste', this._onPaste);
       this.editor.off('blur', this._onBlur);
       this._clearNewlineMarkers();

@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import SingleLineEditor from 'components/SingleLineEditor';
 import { toDisplayString } from '@usebruno/common/utils';
+import { trimTrailingNewlines } from 'utils/common/trimTrailingNewlines';
 import ScopeBadge from './ScopeBadge';
 
 const READ_ONLY_SCOPES = ['process.env', 'runtime', 'dynamic', 'oauth2', 'undefined'];
@@ -94,6 +95,17 @@ const VariableRow = ({
     collapseTimerRef.current = setTimeout(() => setFocused(false), 120);
   }, [draft, onSave]);
 
+  // Strip trailing line breaks from pasted text (they are usually an artifact
+  // of copying from another app). Interior newlines are preserved.
+  const handleTextareaPaste = useCallback((e) => {
+    const pasted = e.clipboardData?.getData('text') || '';
+    const trimmed = trimTrailingNewlines(pasted);
+    if (trimmed !== pasted) {
+      e.preventDefault();
+      document.execCommand('insertText', false, trimmed);
+    }
+  }, []);
+
   // Auto-grow the textarea to fit its content while editing (multi-line wrap allowed).
   useEffect(() => {
     const ta = textareaRef.current;
@@ -175,6 +187,7 @@ const VariableRow = ({
               readOnly={isReadOnly}
               placeholder="No value"
               onChange={handleTextareaChange}
+              onPaste={handleTextareaPaste}
               onBlur={handleTextareaBlur}
               onKeyDown={(e) => {
                 if ((e.key === 'Enter' || e.keyCode === 13) && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {

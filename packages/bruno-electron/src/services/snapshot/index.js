@@ -113,12 +113,21 @@ const sidebarSchema = yup.object({
   width: yup.number().optional()
 });
 
+const recentRequestSchema = yup.object({
+  uid: yup.string().nullable(),
+  collectionUid: yup.string().nullable(),
+  pathname: yup.string().nullable()
+});
+
+const recentRequestsSchema = yup.array().of(recentRequestSchema).optional();
+
 const snapshotSchema = yup.object({
   version: yup.string().defined(),
   activeWorkspacePath: yup.string().nullable(),
   extras: yup.object({
     devTools: devToolsSchema.required(),
-    sidebar: sidebarSchema.optional()
+    sidebar: sidebarSchema.optional(),
+    recentRequests: recentRequestsSchema
   }).required(),
   workspaces: yup.array().of(workspaceSchema).required(),
   collections: yup.array().of(collectionSchema).required()
@@ -130,7 +139,8 @@ const emptySnapshot = {
   extras: {
     devTools: {
       open: false
-    }
+    },
+    recentRequests: []
   },
   workspaces: [],
   collections: []
@@ -425,7 +435,8 @@ class SnapshotManager {
   _normalizeSnapshot(snapshot = {}) {
     const sidebar = this._normalizeSidebar(snapshot?.extras?.sidebar);
     const extras = {
-      devTools: this._normalizeDevTools(snapshot?.extras?.devTools)
+      devTools: this._normalizeDevTools(snapshot?.extras?.devTools),
+      recentRequests: this._normalizeRecentRequests(snapshot?.extras?.recentRequests)
     };
     if (sidebar !== undefined) {
       extras.sidebar = sidebar;
@@ -451,6 +462,29 @@ class SnapshotManager {
       result.width = sidebar.width;
     }
     return Object.keys(result).length > 0 ? result : undefined;
+  }
+
+  _normalizeRecentRequests(recentRequests) {
+    if (!Array.isArray(recentRequests)) {
+      return [];
+    }
+    const seen = new Set();
+    const result = [];
+    for (const entry of recentRequests) {
+      if (!isObject(entry) || typeof entry.uid !== 'string' || !entry.uid) {
+        continue;
+      }
+      if (seen.has(entry.uid)) {
+        continue;
+      }
+      seen.add(entry.uid);
+      result.push({
+        uid: entry.uid,
+        collectionUid: typeof entry.collectionUid === 'string' ? entry.collectionUid : null,
+        pathname: typeof entry.pathname === 'string' ? entry.pathname : null
+      });
+    }
+    return result;
   }
 
   _normalizeDevTools(devTools = {}) {

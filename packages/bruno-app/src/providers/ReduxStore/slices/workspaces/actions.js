@@ -14,7 +14,7 @@ import { findItemInCollection, findItemInCollectionByPathname, getTreePathFromCo
 import { sanitizeName } from 'utils/common/regex';
 import { clearCollectionState } from '../openapi-sync';
 import { updateGlobalEnvironments } from '../global-environments';
-import { addTab, restoreTabs } from '../tabs';
+import { addTab, restoreTabs, setRecentRequests } from '../tabs';
 import {
   setSnapshotReady,
   startSnapshotHydrationSession,
@@ -936,6 +936,15 @@ export const loadLastOpenedWorkspaces = () => {
   };
 };
 
+export const restoreRecentRequestsFromSnapshot = (snapshot) => {
+  return (dispatch) => {
+    const recentRequests = snapshot?.extras?.recentRequests;
+    if (Array.isArray(recentRequests)) {
+      dispatch(setRecentRequests(recentRequests));
+    }
+  };
+};
+
 export const restoreActiveWorkspaceFromSnapshot = () => {
   return async (dispatch, getState) => {
     startupWorkspaceRestorePending = false;
@@ -944,6 +953,10 @@ export const restoreActiveWorkspaceFromSnapshot = () => {
       const snapshot = await ipcRenderer.invoke('renderer:snapshot:get');
       const activeWorkspacePath = snapshot?.activeWorkspacePath;
       const { workspaces } = getState().workspaces;
+
+      // Restore the most recently opened requests (persisted across reloads) so
+      // the Cmd+K "recent" list survives app restarts.
+      dispatch(restoreRecentRequestsFromSnapshot(snapshot));
 
       if (activeWorkspacePath) {
         const normalizedActiveWorkspacePath = normalizePath(activeWorkspacePath);

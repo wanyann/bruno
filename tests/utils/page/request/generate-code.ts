@@ -11,7 +11,7 @@ const getGeneratedSnippet = async (page: Page): Promise<string> => {
   return await test.step('Open Generate Code dialog and read snippet', async () => {
     const { request } = buildCommonLocators(page);
 
-    await request.generateCodeButton().click();
+    await request.generateCodeButton().click({ button: 'right' });
     await expect(page.getByRole('dialog')).toBeVisible();
 
     const codeEditor = page.locator('.editor-content .CodeMirror').first();

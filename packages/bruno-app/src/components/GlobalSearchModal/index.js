@@ -9,18 +9,15 @@ import {
   IconBook
 } from '@tabler/icons';
 import {
-  flattenItems,
-  isItemARequest,
-  isItemAFolder,
   findParentItemInCollection,
-  findItemInCollectionByItemUid,
-  getDefaultRequestPaneTab
+  getDefaultRequestPaneTab,
+  flattenItems
 } from 'utils/collections';
 import { addTab, focusTab, isRequestTabType } from 'providers/ReduxStore/slices/tabs';
 import { toggleCollectionItem, toggleCollection } from 'providers/ReduxStore/slices/collections';
 import { mountCollection } from 'providers/ReduxStore/slices/collections/actions';
 import { normalizePath } from 'utils/common/path';
-import { normalizeQuery, isValidQuery, highlightText, sortResults, getTypeLabel, getItemPath } from './utils/searchUtils';
+import { normalizeQuery, isValidQuery, highlightText, sortResults, getTypeLabel } from './utils/searchUtils';
 import { SEARCH_TYPES, MATCH_TYPES, SEARCH_CONFIG, DOCUMENTATION_RESULT } from './constants';
 import StyledWrapper from './StyledWrapper';
 
@@ -28,9 +25,13 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [results, setResults] = useState([]);
+  const [searchIndexVersion, setSearchIndexVersion] = useState(0);
+  const [isIndexLoading, setIsIndexLoading] = useState(false);
+  const [unresolvedRecentCount, setUnresolvedRecentCount] = useState(0);
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
   const debounceTimeoutRef = useRef(null);
+  const searchIndexRef = useRef(new Map()); // collectionPath -> items[]
   const dispatch = useDispatch();
 
   const allCollections = useSelector((state) => state.collections.collections);
@@ -41,6 +42,16 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
 
   const activeWorkspace = workspaces.find((w) => w.uid === activeWorkspaceUid);
 
+  // The active tab, used to exclude the currently open request from the recents
+  // list. Its uid can temporarily be the file pathname right after a restart
+  // (before the collection mounts and the uid is synced), so we also compare by
+  // pathname for request tabs.
+  const activeTab = useMemo(() => tabs.find((t) => t.uid === activeTabUid), [tabs, activeTabUid]);
+  const activeRequestPath
+    = activeTab && isRequestTabType(activeTab.type) && activeTab.pathname
+      ? normalizePath(activeTab.pathname)
+      : null;
+
   const collections = useMemo(() => {
     if (!activeWorkspace) return allCollections;
 
@@ -50,53 +61,154 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     return allCollections.filter((c) => workspacePaths.has(normalizePath(c.pathname)));
   }, [activeWorkspace, allCollections, workspaces]);
 
-  const REQUEST_TAB_TYPES = ['request', 'http-request', 'grpc-request', 'ws-request', 'graphql-request'];
+  // Look up collection metadata (uid/name) for a given collection pathname.
+  const collectionByPath = useMemo(() => {
+    const map = new Map();
+    collections.forEach((c) => map.set(normalizePath(c.pathname), c));
+    return map;
+  }, [collections]);
 
-  const isRequestTabType = (type) => REQUEST_TAB_TYPES.includes(type);
+  // Synchronous lookup of request items already loaded into Redux (mounted
+  // collections). Recent requests are resolved from here first so the Cmd+K
+  // list can render immediately, without waiting for the disk search index.
+  const reduxRequestLookup = useMemo(() => {
+    const byPath = new Map();
+    const byUid = new Map();
+    collections.forEach((collection) => {
+      flattenItems(collection.items || []).forEach((item) => {
+        if (!item) return;
+        const entry = { it: item, collection };
+        if (item.uid) byUid.set(item.uid, entry);
+        if (item.pathname) byPath.set(normalizePath(item.pathname), entry);
+      });
+    });
+    return { byPath, byUid };
+  }, [collections]);
 
-  // Resolve a request into a result item shaped like search results so it
-  // can be rendered with the exact same markup (name, url/method, type badge).
-  const recentRequestToResult = (recentRequest, tabCollection) => {
-    const item = findItemInCollectionByItemUid(tabCollection, recentRequest.uid);
-    if (!item || !isItemARequest(item)) return null;
-
-    const isGrpcRequest = item.request?.type === 'grpc';
-    let method = item.request?.method || '';
-    if (isGrpcRequest) {
-      const methodType = item.request?.methodType || 'UNARY';
-      method = methodType.toLowerCase().replace(/[_]/g, '-');
+  // Normalize a request method the same way the disk index does, so a recent
+  // item rendered from Redux matches its indexed counterpart (esp. gRPC).
+  const normalizeIndexMethod = (item) => {
+    const request = item?.request || {};
+    if (request.type === 'grpc') {
+      return (request.methodType || request.method || 'UNARY').toLowerCase().replace(/_/g, '-');
     }
+    return request.method || '';
+  };
+
+  // Convert a request descriptor from the disk search index into a result item
+  // shaped like search results so it renders with the same markup.
+  const indexItemToResult = (indexItem, collection) => {
+    if (!collection || !indexItem) return null;
 
     return {
       type: SEARCH_TYPES.REQUEST,
-      item,
-      name: item.name,
-      path: getItemPath(item, tabCollection, findParentItemInCollection),
+      item: {
+        uid: indexItem.uid,
+        name: indexItem.name,
+        type: indexItem.type,
+        pathname: indexItem.pathname,
+        request: { method: indexItem.method, url: indexItem.url, type: indexItem.type }
+      },
+      name: indexItem.name,
+      path: indexItem.pathname,
       matchType: MATCH_TYPES.REQUEST,
-      method,
-      collectionUid: recentRequest.collectionUid
+      method: indexItem.method || '',
+      collectionUid: collection.uid
     };
   };
 
+  // Convert a request item already loaded into Redux into a result item shaped
+  // like search results so it renders with the same markup. Used to show recent
+  // requests instantly, before the disk index has loaded.
+  const reduxItemToResult = (item, collection) => {
+    if (!collection || !item) return null;
+
+    return {
+      type: SEARCH_TYPES.REQUEST,
+      item: {
+        uid: item.uid,
+        name: item.name,
+        type: item.type,
+        pathname: item.pathname,
+        request: { method: normalizeIndexMethod(item), url: item.request?.url || '', type: item.type }
+      },
+      name: item.name,
+      path: item.pathname,
+      matchType: MATCH_TYPES.REQUEST,
+      method: normalizeIndexMethod(item),
+      collectionUid: collection.uid
+    };
+  };
+
+  // Single source of truth for search: the per-collection request index read
+  // from disk (works for unmounted collections). resolvedCollections is the
+  // array of { items, collection } pairs.
+  const resolvedCollections = useMemo(() => {
+    const out = [];
+    searchIndexRef.current.forEach((items, collectionPath) => {
+      const collection = collectionByPath.get(normalizePath(collectionPath));
+      if (!collection) return;
+      out.push({ items: items || [], collection });
+    });
+    return out;
+  }, [collectionByPath, searchIndexVersion]);
+
+  // Recent requests are resolved synchronously from Redux (mounted collections)
+  // first, falling back to the disk index for unmounted/not-yet-loaded ones.
+  // Returns the matched results plus how many recent entries could not be
+  // resolved yet (used to decide whether to show loading skeletons).
   const createRecentTabsResults = () => {
-    const collectionByUid = new Map(collections.map((c) => [c.uid, c]));
+    const indexByUid = new Map();
+    const indexByPath = new Map();
+    resolvedCollections.forEach(({ items, collection }) => {
+      items.forEach((it) => {
+        indexByUid.set(it.uid, { it, collection });
+        if (it.pathname) {
+          indexByPath.set(normalizePath(it.pathname), { it, collection });
+        }
+      });
+    });
 
-    // Only recent requests, within the active workspace, excluding the currently
-    // active request. recentRequests is deduplicated by request and already
-    // newest-first, so we don't need to re-sort.
-    const limited = recentRequests
-      .filter((r) => r && r.uid !== activeTabUid && collectionByUid.has(r.collectionUid))
-      .slice(0, 8);
+    const resolveEntry = (recent, recentPath) => {
+      // Redux first (already-loaded collection trees), then disk index.
+      const reduxEntry = (recentPath && reduxRequestLookup.byPath.get(normalizePath(recentPath)))
+        || reduxRequestLookup.byUid.get(recent.uid);
+      if (reduxEntry) {
+        return reduxItemToResult(reduxEntry.it, reduxEntry.collection);
+      }
+      const indexEntry = (recentPath && indexByPath.get(normalizePath(recentPath)))
+        || indexByUid.get(recent.uid);
+      if (indexEntry) {
+        return indexItemToResult(indexEntry.it, indexEntry.collection);
+      }
+      return null;
+    };
 
+    // recentRequests is deduplicated by request uid and newest-first.
+    // Match by stable absolute pathname (survives request uid re-derivation
+    // across restarts), falling back to uid. Some persisted entries stored the
+    // request's file path as its uid; treat those as a path lookup too.
     const results = [];
-    for (const recentRequest of limited) {
-      const collection = collectionByUid.get(recentRequest.collectionUid);
-      if (!collection) continue;
-      const result = recentRequestToResult(recentRequest, collection);
-      if (result) results.push(result);
+    let unresolvedCount = 0;
+    for (const recent of recentRequests) {
+      if (!recent || !recent.uid || recent.uid === activeTabUid) continue;
+      const recentPath = recent.pathname || (typeof recent.uid === 'string' && recent.uid.includes('/') ? recent.uid : null);
+      const normalizedRecentPath = recentPath ? normalizePath(recentPath) : null;
+      // Skip the currently open request. Its tab uid can still be the file
+      // pathname right after a restart, so match by pathname too (request tabs
+      // only — an example tab shares the parent request's pathname but is a
+      // different tab and must not hide the request).
+      if (activeRequestPath && normalizedRecentPath === activeRequestPath) continue;
+      const result = resolveEntry(recent, recentPath);
+      if (!result) {
+        unresolvedCount += 1;
+      } else {
+        results.push(result);
+      }
+      if (results.length + unresolvedCount >= 8) break;
     }
 
-    return results;
+    return { results, unresolvedCount };
   };
 
   const searchInCollections = (searchTerms, enablePathMatch) => {
@@ -108,7 +220,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
       results.push(DOCUMENTATION_RESULT);
     }
 
-    collections.forEach((collection) => {
+    resolvedCollections.forEach(({ items, collection }) => {
       // Search collection name
       if (searchTerms.every((term) => collection.name.toLowerCase().includes(term))) {
         results.push({
@@ -121,54 +233,29 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
         });
       }
 
-      // Search collection items
-      const flattenedItems = flattenItems(collection.items);
-      flattenedItems.forEach((item) => {
-        const itemPath = getItemPath(item, collection, findParentItemInCollection);
-        const itemPathLower = itemPath.toLowerCase();
+      // Search request items (flat, from the disk index)
+      items.forEach((item) => {
+        const nameMatch = searchTerms.every((term) => (item.name || '').toLowerCase().includes(term));
+        const urlMatch = searchTerms.every((term) => (item.url || '').toLowerCase().includes(term));
+        const pathnameLower = (item.pathname || '').toLowerCase();
+        const pathMatch = enablePathMatch && searchTerms.every((term) => pathnameLower.includes(term));
 
-        if (isItemARequest(item)) {
-          // add an optional check for the item name to prevent a crash if it doesn’t exist.
-          const nameMatch = searchTerms.every((term) => (item.name || '').toLowerCase().includes(term));
-          const urlMatch = searchTerms.every((term) => (item.request?.url || '').toLowerCase().includes(term));
-          const pathMatch = enablePathMatch && searchTerms.every((term) => itemPathLower.includes(term));
-
-          if (nameMatch || urlMatch || pathMatch) {
-            // Check if this is a gRPC request and get the method type
-            const isGrpcRequest = item.request?.type === 'grpc';
-
-            let method = item.request?.method || '';
-
-            if (isGrpcRequest) {
-              // For gRPC requests, use the methodType
-              const methodType = item.request?.methodType || 'UNARY';
-              method = methodType.toLowerCase().replace(/[_]/g, '-');
-            }
-
-            results.push({
-              type: SEARCH_TYPES.REQUEST,
-              item,
+        if (nameMatch || urlMatch || pathMatch) {
+          results.push({
+            type: SEARCH_TYPES.REQUEST,
+            item: {
+              uid: item.uid,
               name: item.name,
-              path: itemPath,
-              matchType: nameMatch ? MATCH_TYPES.REQUEST : urlMatch ? MATCH_TYPES.URL : MATCH_TYPES.PATH,
-              method,
-              collectionUid: collection.uid
-            });
-          }
-        } else if (isItemAFolder(item)) {
-          const nameMatch = searchTerms.every((term) => item.name.toLowerCase().includes(term));
-          const pathMatch = enablePathMatch && searchTerms.every((term) => itemPathLower.includes(term));
-
-          if (nameMatch || pathMatch) {
-            results.push({
-              type: SEARCH_TYPES.FOLDER,
-              item,
-              name: item.name,
-              path: itemPath,
-              matchType: nameMatch ? MATCH_TYPES.FOLDER : MATCH_TYPES.PATH,
-              collectionUid: collection.uid
-            });
-          }
+              type: item.type,
+              pathname: item.pathname,
+              request: { method: item.method, url: item.url, type: item.type }
+            },
+            name: item.name,
+            path: item.pathname,
+            matchType: nameMatch ? MATCH_TYPES.REQUEST : urlMatch ? MATCH_TYPES.URL : MATCH_TYPES.PATH,
+            method: item.method || '',
+            collectionUid: collection.uid
+          });
         }
       });
     });
@@ -180,9 +267,13 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     const normalizedQuery = normalizeQuery(searchQuery);
 
     if (!normalizedQuery) {
-      setResults(createRecentTabsResults());
+      const { results: recentResults, unresolvedCount } = createRecentTabsResults();
+      setResults(recentResults);
+      setUnresolvedRecentCount(unresolvedCount);
       return;
     }
+
+    setUnresolvedRecentCount(0);
 
     if (!isValidQuery(normalizedQuery)) {
       setResults([]);
@@ -213,7 +304,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     debounceTimeoutRef.current = setTimeout(() => {
       performSearch(searchQuery);
     }, SEARCH_CONFIG.DEBOUNCE_DELAY);
-  }, [collections]); // Depend on collections to recreate when they change
+  }, [collections, searchIndexVersion, reduxRequestLookup]); // Refresh when the disk index (re)loads or collections finish mounting
 
   const expandItemPath = (result) => {
     const collection = collections.find((c) => c.uid === result.collectionUid);
@@ -353,7 +444,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     }
 
     setQuery('');
-    setResults([]);
+    performSearch('');
   };
 
   // Initialize modal when opened
@@ -361,17 +452,67 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     if (isOpen) {
       const timeoutId = setTimeout(() => inputRef.current?.focus(), SEARCH_CONFIG.FOCUS_DELAY);
       setQuery('');
-      performSearch('');
+      setResults([]);
       setSelectedIndex(0);
+      setUnresolvedRecentCount(0);
+
+      // Resolve recent requests synchronously from Redux so the list can show
+      // immediately, before the disk index resolves.
+      performSearch('');
+
+      // Refresh the disk search index from main (fast, cached) and search.
+      const hasIpc = Boolean(window.ipcRenderer?.invoke);
+      setIsIndexLoading(hasIpc);
+      if (hasIpc) {
+        const collectionPaths = collections.map((c) => c.pathname).filter(Boolean);
+        window.ipcRenderer
+          .invoke('renderer:search:get-index', { collectionPaths })
+          .then((result) => {
+            if (!Array.isArray(result)) return;
+            const next = new Map();
+            result.forEach((entry) => {
+              if (entry && entry.collectionPath) {
+                next.set(normalizePath(entry.collectionPath), Array.isArray(entry.items) ? entry.items : []);
+              }
+            });
+            searchIndexRef.current = next;
+            setSearchIndexVersion((v) => v + 1);
+          })
+          .catch((err) => {
+            console.error('Failed to load search index:', err);
+          })
+          .finally(() => {
+            setIsIndexLoading(false);
+          });
+      }
 
       return () => clearTimeout(timeoutId);
     } else {
+      setIsIndexLoading(false);
       // Clear any pending debounced search when modal closes
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Re-run search once the disk index has been (re)loaded.
+  useEffect(() => {
+    if (isOpen) {
+      performSearch(query);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchIndexVersion]);
+
+  // Re-run search when the synchronous Redux item lookup changes (e.g. a
+  // collection finished mounting), so recents upgrade in place.
+  useEffect(() => {
+    if (isOpen) {
+      performSearch(query);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduxRequestLookup]);
 
   // Auto-scroll selected item into view
   useEffect(() => {
@@ -489,7 +630,19 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
             role="listbox"
             aria-label="Search results"
           >
-            {results.length === 0 && query ? (
+            {!query && isIndexLoading && unresolvedRecentCount > 0 ? (
+              <div className="skeleton-list" data-testid="recent-requests-skeleton" aria-hidden="true">
+                {Array.from({ length: Math.min(unresolvedRecentCount, 8) }).map((_, index) => (
+                  <div className="skeleton-item" key={`skeleton-${index}`}>
+                    <div className="skeleton-method" />
+                    <div className="skeleton-content">
+                      <div className="skeleton-line skeleton-line-name" />
+                      <div className="skeleton-line skeleton-line-path" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : results.length === 0 && query ? (
               <div className="no-results">
                 <p>
                   No results found for "{query}".
@@ -502,10 +655,10 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
             ) : results.length === 0 ? (
               <div className="empty-state">
                 <p>
-                  No collections are currently mounted or visible.
+                  No recent requests yet.
                   <br />
                   <span className="block mt-2">
-                    Mount a collection via the sidebar or this search modal, then try again.
+                    Open a request from the sidebar and it will show up here. Type above to search all collections and documentation.
                   </span>
                 </p>
               </div>

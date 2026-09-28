@@ -70,11 +70,15 @@ const findTabByPathname = (tabs, { collectionUid, pathname, type, exampleName, e
 
 // Tracks the most recently opened requests (by request item uid), independent of
 // tabs (a single tab may be reused for several requests). Newest first.
-const registerRecentRequest = (state, itemUid, collectionUid) => {
+// `pathname` (absolute file path) is the stable identity used to match against
+// the disk search index across restarts, since request uids may be re-derived.
+const registerRecentRequest = (state, itemUid, collectionUid, pathname) => {
   if (!itemUid) return;
   if (collectionUid) {
-    state.recentRequests = state.recentRequests.filter((r) => r.uid !== itemUid);
-    state.recentRequests.unshift({ uid: itemUid, collectionUid });
+    state.recentRequests = state.recentRequests.filter(
+      (r) => r.uid !== itemUid && (!pathname || r.pathname !== pathname)
+    );
+    state.recentRequests.unshift({ uid: itemUid, collectionUid, pathname: pathname || null });
   }
   if (state.recentRequests.length > MAX_RECENT_REQUESTS) {
     state.recentRequests = state.recentRequests.slice(0, MAX_RECENT_REQUESTS);
@@ -108,7 +112,7 @@ export const tabsSlice = createSlice({
       // requests), independent of the tab itself. For request tabs, the item's
       // uid is passed as `uid`.
       if (isRequestTabType(type || '') && uid) {
-        registerRecentRequest(state, uid, collectionUid);
+        registerRecentRequest(state, uid, collectionUid, pathname);
       }
 
       const nonReplaceableTabTypes = [
@@ -244,13 +248,23 @@ export const tabsSlice = createSlice({
       });
       state.activeTabUid = uid;
     },
+    setRecentRequests: (state, action) => {
+      const next = Array.isArray(action.payload)
+        ? action.payload.filter((r) => r && r.uid).map((r) => ({
+            uid: r.uid,
+            collectionUid: r.collectionUid || null,
+            pathname: r.pathname || null
+          }))
+        : [];
+      state.recentRequests = next.slice(0, MAX_RECENT_REQUESTS);
+    },
     focusTab: (state, action) => {
       const { uid } = action.payload;
       const tabToFocus = find(state.tabs, (t) => t.uid === uid);
       if (tabToFocus) {
         tabToFocus.lastUsedAt = Date.now();
         if (isRequestTabType(tabToFocus.type) && uid) {
-          registerRecentRequest(state, uid, tabToFocus.collectionUid);
+          registerRecentRequest(state, uid, tabToFocus.collectionUid, tabToFocus.pathname);
         }
         state.activeTabUid = uid;
       }
@@ -714,6 +728,7 @@ export const {
   restoreTabs,
   updateTabState,
   setTabAppPreview,
+  setRecentRequests,
   reopenLastClosedTab,
   updateQueryBuilderOpen,
   updateQueryBuilderWidth,

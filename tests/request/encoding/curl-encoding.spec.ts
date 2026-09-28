@@ -10,7 +10,7 @@ test.describe('Code Generation URL Encoding', () => {
       await openCollection(page, 'encoding-test');
       await sidebar.request('encode-url-unencoded').click();
 
-      await request.generateCodeButton().click();
+      await request.generateCodeButton().click({ button: 'right' });
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const codeEditor = page.locator('.editor-content .CodeMirror').first();
@@ -29,7 +29,7 @@ test.describe('Code Generation URL Encoding', () => {
       await openCollection(page, 'encoding-test');
       await sidebar.request('encode-url-preencoded').click();
 
-      await request.generateCodeButton().click();
+      await request.generateCodeButton().click({ button: 'right' });
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const codeEditor = page.locator('.editor-content .CodeMirror').first();
@@ -50,7 +50,7 @@ test.describe('Code Generation URL Encoding', () => {
       await openCollection(page, 'encoding-test');
       await sidebar.request('raw-url-unencoded').click();
 
-      await request.generateCodeButton().click();
+      await request.generateCodeButton().click({ button: 'right' });
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const codeEditor = page.locator('.editor-content .CodeMirror').first();
@@ -69,7 +69,7 @@ test.describe('Code Generation URL Encoding', () => {
       await openCollection(page, 'encoding-test');
       await sidebar.request('raw-url-preencoded').click();
 
-      await request.generateCodeButton().click();
+      await request.generateCodeButton().click({ button: 'right' });
       await expect(page.getByRole('dialog')).toBeVisible();
 
       const codeEditor = page.locator('.editor-content .CodeMirror').first();

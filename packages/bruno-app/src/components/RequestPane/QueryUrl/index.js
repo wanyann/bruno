@@ -23,6 +23,8 @@ import { isMacOS } from 'utils/common/platform';
 import { hasRequestChanges } from 'utils/collections';
 import StyledWrapper from './StyledWrapper';
 import GenerateCodeItem from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/index';
+import { generateSnippet } from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/utils/snippet-generator';
+import { getLanguages } from 'utils/codegenerator/targets';
 import ToolHint from 'components/ToolHint';
 import toast from 'react-hot-toast';
 
@@ -90,6 +92,38 @@ const QueryUrl = ({ item, collection, handleRun }) => {
       setGenerateCodeItemModalOpen(true);
     } else {
       toast.error('URL is required');
+    }
+  };
+
+  // Left-click copies the active request as a shell/curl snippet (variables interpolated),
+  // matching the default Generate Code window.
+  const handleCopyCurl = async () => {
+    const currentUrl = item.draft ? get(item, 'draft.request.url') : get(item, 'request.url');
+    if (!currentUrl) {
+      toast.error('URL is required');
+      return;
+    }
+
+    try {
+      const language = getLanguages()[0]; // Shell-curl
+      const snippet = await generateSnippet({ language, item, collection, shouldInterpolate: true });
+
+      // Prefer the async clipboard API, falling back to a hidden textarea for older Electron.
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(snippet);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = snippet;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success('Copied to clipboard!');
+    } catch (error) {
+      toast.error('Failed to copy curl to clipboard');
     }
   };
 
@@ -417,11 +451,16 @@ const QueryUrl = ({ item, collection, handleRun }) => {
             disableLinkAwareClick={true}
           />
           <div className="flex items-center h-full mx-2 gap-3" id="request-actions">
-            <ToolHint text="Generate Code" toolhintId="http-generate-code" place="top" positionStrategy="fixed">
+            <ToolHint text="Copy as cURL (right-click for Generate Code)" toolhintId="http-generate-code" place="top" positionStrategy="fixed">
               <div
                 className="flex items-center"
                 data-testid="generate-code-button"
-                onClick={(e) => {
+                onClick={() => {
+                  handleCopyCurl();
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   handleGenerateCode(e);
                 }}
               >

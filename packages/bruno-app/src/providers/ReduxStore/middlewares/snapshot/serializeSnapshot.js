@@ -121,7 +121,8 @@ export const serializeSnapshot = async (state, options = {}) => {
       sidebar: {
         width: state.app.leftSidebarWidth,
         collapsed: state.app.sidebarCollapsed
-      }
+      },
+      recentRequests: (tabs.recentRequests || [])
     },
     workspaces: [],
     collections: []
