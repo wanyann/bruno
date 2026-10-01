@@ -121,6 +121,7 @@ const QueryParams = ({ item, collection }) => {
           item={item}
           variablesAutocomplete={true}
           placeholder={!value ? 'Value' : ''}
+          disableLinkAware
         />
       )
     },
@@ -148,6 +149,7 @@ const QueryParams = ({ item, collection }) => {
           onRun={handleRun}
           collection={collection}
           item={item}
+          disableLinkAware
         />
       )
     },

@@ -200,6 +200,7 @@ const MultipartFormParams = ({ item, collection }) => {
                 collection={collection}
                 item={item}
                 placeholder={!value ? 'Value' : ''}
+                disableLinkAware
               />
             </div>
             <button
@@ -228,6 +229,7 @@ const MultipartFormParams = ({ item, collection }) => {
           onChange={onChange}
           onRun={handleRun}
           collection={collection}
+          disableLinkAware
         />
       )
     },

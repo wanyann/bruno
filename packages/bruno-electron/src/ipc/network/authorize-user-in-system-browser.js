@@ -1,5 +1,5 @@
-const { shell } = require('electron');
 const { registerOauth2AuthorizationRequest, rejectOauth2AuthorizationRequest } = require('../../utils/oauth2-protocol-handler');
+const { openExternal } = require('../../utils/open-external');
 
 const authorizeUserInSystemBrowser = ({ authorizeUrl, callbackUrl, grantType = 'authorization_code', expectedState = null }) => {
   return new Promise((resolve, reject) => {
@@ -54,7 +54,7 @@ const authorizeUserInSystemBrowser = ({ authorizeUrl, callbackUrl, grantType = '
     registerOauth2AuthorizationRequest(wrappedResolve, wrappedReject, debugInfo, expectedState);
 
     // Open system browser
-    shell.openExternal(modifiedAuthorizeUrl).catch((error) => {
+    openExternal(modifiedAuthorizeUrl).catch((error) => {
       rejectOauth2AuthorizationRequest(error);
     });
   });

@@ -219,6 +219,7 @@ const AdditionalParams = ({ item = {}, request, updateAuth, collection, handleSa
                   })}
                   collection={collection}
                   onSave={handleSave}
+                  disableLinkAware
                 />
               </td>
               <td>

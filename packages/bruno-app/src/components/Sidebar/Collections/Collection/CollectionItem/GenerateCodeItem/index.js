@@ -10,6 +10,7 @@ import { getLanguages } from 'utils/codegenerator/targets';
 import { useSelector } from 'react-redux';
 import { getAllVariables, getGlobalEnvironmentVariables } from 'utils/collections/index';
 import { resolveInheritedAuth } from 'utils/auth';
+import { buildRequestItemForCodegen } from './utils/snippet-generator';
 
 const TEMPLATE_VAR_PATTERN = /\{\{([^}]+)\}\}/;
 
@@ -98,15 +99,19 @@ const GenerateCodeItem = ({ collectionUid, item, onClose, isExample = false, exa
   const resolvedRequest = resolveInheritedAuth(item, collection);
 
   // requestData.request contains either the normal request or example request data.
-  // We explicitly set auth from resolvedRequest to ensure inherited auth
-  // (from folders/collection) is resolved correctly in generated code.
-  const finalItem = {
-    ...item,
-    request: {
-      ...requestData.request,
-      auth: resolvedRequest.auth
-    }
-  };
+  // For a normal request we reuse the shared codegen item builder (draft-aware +
+  // resolved auth) so this modal and the left-click "copy as cURL" action produce
+  // identical snippets. For an example we must use the example's own request data
+  // with the item's resolved auth.
+  const finalItem = isExample
+    ? {
+        ...item,
+        request: {
+          ...requestData.request,
+          auth: resolvedRequest.auth
+        }
+      }
+    : buildRequestItemForCodegen(item, collection);
 
   // Update modal title based on mode
   const modalTitle = isExample ? `Generate Code - ${get(item, 'draft.examples', []).find((e) => e.uid === exampleUid)?.name || 'Example'}` : 'Generate Code';

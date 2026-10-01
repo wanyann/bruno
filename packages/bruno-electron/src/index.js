@@ -15,8 +15,9 @@ if (isDev) {
 }
 
 const { format } = require('url');
-const { BrowserWindow, app, session, Menu, globalShortcut, ipcMain, nativeTheme, shell } = require('electron');
+const { BrowserWindow, app, session, Menu, globalShortcut, ipcMain, nativeTheme } = require('electron');
 const { setContentSecurityPolicy } = require('electron-util');
+const { openExternal } = require('./utils/open-external');
 
 if (isDev && process.env.ELECTRON_USER_DATA_PATH) {
   console.debug('`ELECTRON_USER_DATA_PATH` found, modifying `userData` path: \n'
@@ -242,7 +243,10 @@ app.on('ready', async () => {
       nodeIntegration: true,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webviewTag: true
+      webviewTag: true,
+      // Keep the renderer running at full speed when the window is hidden for
+      // headless test runs (otherwise background throttling would pause timers).
+      backgroundThrottling: process.env.BRUNO_TEST_HEADLESS !== 'true'
     },
     title: 'Bruno',
     icon: path.join(__dirname, 'about/256x256.png'),
@@ -369,7 +373,16 @@ app.on('ready', async () => {
       const zoomLevel = percentageToZoomLevel(zoomPercentage);
       mainWindow.webContents.setZoomLevel(zoomLevel);
     }
-    mainWindow.show();
+    // When running automated tests we can keep the window hidden so the app
+    // never appears on screen. Playwright drives the renderer regardless of
+    // window visibility (the BrowserWindow still has its full size).
+    if (process.env.BRUNO_TEST_HEADLESS === 'true') {
+      if (isMac && app.dock) {
+        app.dock.hide();
+      }
+    } else {
+      mainWindow.show();
+    }
   });
   const devPort = process.env.BRUNO_DEV_PORT || 3000;
   const url = isDev
@@ -437,7 +450,9 @@ app.on('ready', async () => {
   mainWindow.webContents.on('will-redirect', (event, url) => {
     event.preventDefault();
     if (/^(http:\/\/|https:\/\/)/.test(url)) {
-      require('electron').shell.openExternal(url);
+      openExternal(url).catch((err) => {
+        console.error('Failed to open external URL:', err);
+      });
     }
   });
 
@@ -471,7 +486,7 @@ app.on('ready', async () => {
     try {
       const { protocol } = new URL(url);
       if (['https:', 'http:'].includes(protocol)) {
-        require('electron').shell.openExternal(url);
+        openExternal(url);
       }
     } catch (e) {
       console.error(e);
@@ -485,7 +500,7 @@ app.on('ready', async () => {
     // navigate the popout document itself (that would tear down the portal).
     const openExternally = (url) => {
       if (/^https?:\/\//.test(url)) {
-        shell.openExternal(url).catch((err) => {
+        openExternal(url).catch((err) => {
           console.error('Failed to open external URL from AI popout:', err);
         });
       }

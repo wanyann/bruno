@@ -252,6 +252,14 @@ const Console = () => {
     return () => observer.disconnect();
   }, []);
 
+  // Focus the Console panel when it becomes the active tab (e.g. via the toggle
+  // shortcut) without scrolling the viewport.
+  useEffect(() => {
+    if (activeTab === 'console' && consoleRef.current) {
+      consoleRef.current.focus({ preventScroll: true });
+    }
+  }, [activeTab]);
+
   const detailsPanelMaxWidth = consoleWidth
     ? Math.max(MIN_DETAILS_PANEL_WIDTH, consoleWidth * DETAILS_PANEL_MAX_RATIO)
     : Number.POSITIVE_INFINITY;
@@ -434,7 +442,7 @@ const Console = () => {
   };
 
   return (
-    <StyledWrapper ref={consoleRef}>
+    <StyledWrapper ref={consoleRef} tabIndex={-1}>
       <div
         className="console-resize-handle"
       />
@@ -443,6 +451,7 @@ const Console = () => {
         <div className="console-tabs">
           <button
             className={`console-tab ${activeTab === 'console' ? 'active' : ''}`}
+            data-testid="console-tab"
             onClick={() => handleTabChange('console')}
           >
             <IconTerminal2 size={16} strokeWidth={1.5} />

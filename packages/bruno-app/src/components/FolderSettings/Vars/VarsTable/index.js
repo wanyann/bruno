@@ -93,6 +93,7 @@ const VarsTable = ({ folder, collection, vars, varType, initialScroll = 0, isDra
               onChange={onChange}
               collection={collection}
               item={folder}
+              disableLinkAware
               placeholder={value == null || (typeof value === 'string' && value.trim() === '') ? (varType === 'request' ? 'Value' : 'Expr') : ''}
             />
           )}

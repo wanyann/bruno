@@ -385,15 +385,18 @@ class CodeEditor extends React.Component {
       });
     }
 
-    setupLinkAware(editor, {
-      onLinkClick: (typeof this.props.onLinkClick === 'function' || resolveLinkClickHandler(this.props.item, this.props.collection))
-        ? this.handleLinkClick
-        : undefined
-    });
+    if (!this.props.disableLinkAware) {
+      setupLinkAware(editor, {
+        onLinkClick: (typeof this.props.onLinkClick === 'function' || resolveLinkClickHandler(this.props.item, this.props.collection))
+          ? this.handleLinkClick
+          : undefined
+      });
+    }
     this._linkAwareItemType = this.props.item?.type;
     this._linkAwareCollectionUid = this.props.collection?.uid;
     this._linkAwarePresetType = getRequestTypeFromCollectionPresets(this.props.collection);
     this._linkAwareHasOnLinkClickProp = typeof this.props.onLinkClick === 'function';
+    this._linkAwareDisabled = this.props.disableLinkAware;
   };
 
   _disableEnhancedFeatures = () => {
@@ -551,22 +554,27 @@ class CodeEditor extends React.Component {
       const collectionUid = this.props.collection?.uid;
       const presetType = getRequestTypeFromCollectionPresets(this.props.collection);
       const hasOnLinkClickProp = typeof this.props.onLinkClick === 'function';
+      const linkAwareDisabled = this.props.disableLinkAware;
       if (
         itemType !== this._linkAwareItemType
         || collectionUid !== this._linkAwareCollectionUid
         || presetType !== this._linkAwarePresetType
         || hasOnLinkClickProp !== this._linkAwareHasOnLinkClickProp
+        || linkAwareDisabled !== this._linkAwareDisabled
       ) {
         this._linkAwareItemType = itemType;
         this._linkAwareCollectionUid = collectionUid;
         this._linkAwarePresetType = presetType;
         this._linkAwareHasOnLinkClickProp = hasOnLinkClickProp;
+        this._linkAwareDisabled = linkAwareDisabled;
         this.editor._destroyLinkAware?.();
-        setupLinkAware(this.editor, {
-          onLinkClick: (typeof this.props.onLinkClick === 'function' || resolveLinkClickHandler(this.props.item, this.props.collection))
-            ? this.handleLinkClick
-            : undefined
-        });
+        if (!linkAwareDisabled) {
+          setupLinkAware(this.editor, {
+            onLinkClick: (typeof this.props.onLinkClick === 'function' || resolveLinkClickHandler(this.props.item, this.props.collection))
+              ? this.handleLinkClick
+              : undefined
+          });
+        }
         this.editor.refresh();
       }
     }

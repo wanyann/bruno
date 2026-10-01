@@ -527,6 +527,7 @@ const NewRequest = ({ collectionUid, item, isEphemeral, onClose }) => {
                         }}
                         collection={collection}
                         variablesAutocomplete={true}
+                        disableLinkAware
                       />
                     </div>
                   </div>

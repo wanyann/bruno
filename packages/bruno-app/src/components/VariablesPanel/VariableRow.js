@@ -177,6 +177,7 @@ const VariableRow = ({
               placeholder={valueIsEmpty ? 'No value' : undefined}
               onChange={handleScopeChange}
               enableBrunoVarInfo
+              disableLinkAware
             />
           ) : focused ? (
             <textarea

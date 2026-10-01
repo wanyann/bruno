@@ -10,6 +10,8 @@ import {
 import { buildCommonLocators } from '../utils/page/locators';
 
 export const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+// Move Tab Left/Right defaults: mac uses Control, Windows uses Alt.
+export const moveTabModifier = process.platform === 'darwin' ? 'Control' : 'Alt';
 export const collectionName = 'kb-collection';
 export const baseRequests = ['req-1', 'req-2', 'req-3', 'req-4', 'req-5', 'req-6', 'req-7', 'req-8', 'req-9'];
 

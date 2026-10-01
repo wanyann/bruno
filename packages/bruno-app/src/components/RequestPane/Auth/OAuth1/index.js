@@ -253,6 +253,7 @@ const OAuth1 = ({ item = {}, collection, request, save, updateAuth }) => {
                   item={item}
                   isSecret={true}
                   allowNewlines={true}
+                  disableLinkAware
                 />
                 {privateKeySensitive.showWarning && <SensitiveFieldWarning fieldName="oauth1-private-key" warningMessage={privateKeySensitive.warningMessage} />}
               </div>

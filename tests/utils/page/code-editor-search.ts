@@ -212,3 +212,44 @@ export const appendTextToCodeEditor = async (page: Page, editorId: string, text:
     }
   }, text);
 };
+
+/**
+ * Place the caret at a position, focus the editor, and type real keystrokes so
+ * CodeMirror emits `change` events (unlike `replaceRange`). Used to verify that
+ * an inline edit lands at the caret instead of being hijacked by the search.
+ */
+export const typeAtCodeEditorCursor = async (
+  page: Page,
+  editorId: string,
+  pos: { line: number; ch: number },
+  text: string
+) => {
+  const cm = page.getByTestId(editorId).locator('.CodeMirror').first();
+  await cm.evaluate((el: any, pos: { line: number; ch: number }) => {
+    if (el.CodeMirror) {
+      el.CodeMirror.setCursor(pos);
+      el.CodeMirror.focus();
+    }
+  }, pos);
+  await page.keyboard.type(text);
+  await page.waitForTimeout(50);
+};
+
+/**
+ * Returns the current caret position of the editor.
+ */
+export const getCodeEditorCursor = async (page: Page, editorId: string): Promise<{ line: number; ch: number }> => {
+  const cm = page.getByTestId(editorId).locator('.CodeMirror').first();
+  return cm.evaluate((el: any) => {
+    const cursor = el.CodeMirror.getCursor();
+    return { line: cursor.line, ch: cursor.ch };
+  });
+};
+
+/**
+ * Returns the text of a single editor line.
+ */
+export const getCodeEditorLine = async (page: Page, editorId: string, line: number): Promise<string> => {
+  const cm = page.getByTestId(editorId).locator('.CodeMirror').first();
+  return cm.evaluate((el: any, line: number) => el.CodeMirror.getLine(line) || '', line);
+};

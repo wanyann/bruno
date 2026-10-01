@@ -391,6 +391,7 @@ const CollectionApp = ({ item, collection }) => {
             onEdit={onEdit}
             onSave={onSave}
             mode="htmlmixed"
+            disableLinkAware
           />
         </div>
       ) : code && code.trim().length ? (

@@ -5,6 +5,7 @@ import { getAllVariables, getRequestTypeFromCollectionPresets } from 'utils/coll
 import { defineCodeMirrorBrunoVariablesMode } from 'utils/common/codemirror';
 import { setupAutoComplete } from 'utils/codemirror/autocomplete';
 import { MaskedEditor } from 'utils/common/masked-editor';
+import { startsWithVariableReference } from 'utils/common/variables';
 import {
   applyEditorState,
   captureViewState,
@@ -199,12 +200,15 @@ class MultiLineEditor extends Component {
       autoCompleteOptions
     );
 
-    setupLinkAware(this.editor, {
-      onLinkClick: resolveLinkClickHandler(this.props.item, this.props.collection)
-    });
+    if (!this.props.disableLinkAware) {
+      setupLinkAware(this.editor, {
+        onLinkClick: resolveLinkClickHandler(this.props.item, this.props.collection)
+      });
+    }
     this._linkAwareItemType = this.props.item?.type;
     this._linkAwareCollectionUid = this.props.collection?.uid;
     this._linkAwarePresetType = getRequestTypeFromCollectionPresets(this.props.collection);
+    this._linkAwareDisabled = this.props.disableLinkAware;
 
     // Add mousetrap calss so Mousetrap captures shortcuts even when Codemirror is focused
     const cmInput = this.editor.getInputField();
@@ -262,7 +266,11 @@ class MultiLineEditor extends Component {
     if (typeof enabled !== 'boolean') return;
 
     if (enabled == true) {
-      if (!this.maskedEditor) this.maskedEditor = new MaskedEditor(this.editor, '*');
+      if (!this.maskedEditor) {
+        this.maskedEditor = new MaskedEditor(this.editor, '*', {
+          shouldMask: (value) => !startsWithVariableReference(value)
+        });
+      }
       this.maskedEditor.enable();
     } else {
       if (this.maskedEditor) {
@@ -301,14 +309,23 @@ class MultiLineEditor extends Component {
     const itemType = this.props.item?.type;
     const collectionUid = this.props.collection?.uid;
     const presetType = getRequestTypeFromCollectionPresets(this.props.collection);
-    if (itemType !== this._linkAwareItemType || collectionUid !== this._linkAwareCollectionUid || presetType !== this._linkAwarePresetType) {
+    const linkAwareDisabled = this.props.disableLinkAware;
+    if (
+      itemType !== this._linkAwareItemType
+      || collectionUid !== this._linkAwareCollectionUid
+      || presetType !== this._linkAwarePresetType
+      || linkAwareDisabled !== this._linkAwareDisabled
+    ) {
       this._linkAwareItemType = itemType;
       this._linkAwareCollectionUid = collectionUid;
       this._linkAwarePresetType = presetType;
+      this._linkAwareDisabled = linkAwareDisabled;
       this.editor._destroyLinkAware?.();
-      setupLinkAware(this.editor, {
-        onLinkClick: resolveLinkClickHandler(this.props.item, this.props.collection)
-      });
+      if (!linkAwareDisabled) {
+        setupLinkAware(this.editor, {
+          onLinkClick: resolveLinkClickHandler(this.props.item, this.props.collection)
+        });
+      }
       this.editor.refresh();
     }
     if (this.props.theme !== prevProps.theme && this.editor) {

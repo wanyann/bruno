@@ -101,6 +101,7 @@ const VarsTable = ({ item, collection, vars, varType, initialScroll = 0, isDraft
               onRun={handleRun}
               collection={collection}
               item={item}
+              disableLinkAware
               placeholder={value == null || (typeof value === 'string' && value.trim() === '') ? (varType === 'request' ? 'Value' : 'Expr') : ''}
             />
           )}

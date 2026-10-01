@@ -16,6 +16,14 @@ export const isRequestTabType = (type) => REQUEST_TAB_TYPES.includes(type);
 
 export const NON_CLOSABLE_TAB_TYPES = ['workspaceOverview', 'workspaceEnvironments'];
 
+// Transient requests live in a per-session temp directory and are deleted on
+// exit, so a persisted recent entry pointing at one can never be resolved after
+// a restart. Such entries are dropped from `recentRequests`.
+const TRANSIENT_PATH_SEGMENT = /[\\/]tmp[\\/]transient[\\/]/;
+
+export const isTransientRecentPath = (pathname) =>
+  typeof pathname === 'string' && TRANSIENT_PATH_SEGMENT.test(pathname);
+
 const ensureTabUid = (tab) => {
   if (!tab.uid) {
     tab.uid = uuid();
@@ -74,6 +82,8 @@ const findTabByPathname = (tabs, { collectionUid, pathname, type, exampleName, e
 // the disk search index across restarts, since request uids may be re-derived.
 const registerRecentRequest = (state, itemUid, collectionUid, pathname) => {
   if (!itemUid) return;
+  // Transient requests are session-only; they'd be unresolvable after a restart.
+  if (isTransientRecentPath(pathname)) return;
   if (collectionUid) {
     state.recentRequests = state.recentRequests.filter(
       (r) => r.uid !== itemUid && (!pathname || r.pathname !== pathname)
@@ -250,11 +260,13 @@ export const tabsSlice = createSlice({
     },
     setRecentRequests: (state, action) => {
       const next = Array.isArray(action.payload)
-        ? action.payload.filter((r) => r && r.uid).map((r) => ({
-            uid: r.uid,
-            collectionUid: r.collectionUid || null,
-            pathname: r.pathname || null
-          }))
+        ? action.payload
+            .filter((r) => r && r.uid && !isTransientRecentPath(r.pathname))
+            .map((r) => ({
+              uid: r.uid,
+              collectionUid: r.collectionUid || null,
+              pathname: r.pathname || null
+            }))
         : [];
       state.recentRequests = next.slice(0, MAX_RECENT_REQUESTS);
     },

@@ -440,6 +440,7 @@ const ClientCertSettings = ({ collection }) => {
                     onChange={(val) => formik.setFieldValue('passphrase', val)}
                     collection={collection}
                     isSecret={true}
+                    disableLinkAware
                   />
                   {showWarning && <SensitiveFieldWarning fieldName="basic-password" warningMessage={warningMessage} />}
                 </div>

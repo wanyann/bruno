@@ -62,9 +62,12 @@
  */
 
 export class MaskedEditor {
-  constructor(editor, maskChar = '*') {
+  constructor(editor, maskChar = '*', options = {}) {
     this.editor = editor;
     this.maskChar = maskChar;
+    // Predicate deciding, per current editor value, whether masking should apply.
+    // Defaults to always-mask so existing callers are unaffected.
+    this.shouldMask = typeof options.shouldMask === 'function' ? options.shouldMask : () => true;
     this.enabled = false;
     this.isProcessing = false;
     this.marks = new Set();
@@ -155,6 +158,12 @@ export class MaskedEditor {
       const content = this.editor.getValue();
       const lineCount = this.editor.lineCount();
 
+      // Skip masking entirely when the value opted out (e.g. a variable reference).
+      if (!this.shouldMask(content)) {
+        this.clearAllMarks();
+        return;
+      }
+
       // For multiline content, use more efficient line-based masking
       if (lineCount > 1) {
         this.clearAllMarks();
@@ -229,33 +238,16 @@ export class MaskedEditor {
 
     this.clearAllMarks();
 
+    // Skip masking entirely when the value opted out (e.g. a variable reference).
+    if (!this.shouldMask(content)) {
+      return;
+    }
+
     // Apply new masking based on content size
     if (content.length <= 500) {
       this.applyCharacterMasking(content);
     } else {
       // For large content, we apply line-by-line masking for high performance
-      this.applyLineMasking(lineCount);
-    }
-  }
-
-  /**
-   * Apply masking with editor operation for enable operations
-   */
-  applyMasking() {
-    const content = this.editor.getValue();
-    const lineCount = this.editor.lineCount();
-
-    if (lineCount === 0) {
-      return;
-    }
-
-    this.clearAllMarks();
-
-    // Apply new masking based on content size with editor operation
-    if (content.length <= 500) {
-      this.applyCharacterMasking(content);
-    } else {
-      // For large content, we apply line-by-line masking (fast synchronous)
       this.applyLineMasking(lineCount);
     }
   }

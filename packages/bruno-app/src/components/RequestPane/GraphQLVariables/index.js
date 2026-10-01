@@ -39,6 +39,7 @@ const GraphQLVariables = ({ variables, item, collection }) => {
       onSave={onSave}
       enableVariableHighlighting={true}
       showHintsFor={['variables']}
+      disableLinkAware
     />
   );
 };

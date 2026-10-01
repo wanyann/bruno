@@ -66,6 +66,7 @@ const RequestBody = ({ item, collection }) => {
           mode={codeMirrorMode[bodyMode]}
           enableVariableHighlighting={true}
           showHintsFor={['variables']}
+          disableLinkAware
         />
       </StyledWrapper>
     );

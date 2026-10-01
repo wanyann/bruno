@@ -353,6 +353,7 @@ const RequestHeaders = ({ item, collection, addHeaderText }) => {
               collection={collection}
               item={item}
               placeholder={!value ? 'Name' : ''}
+              disableLinkAware
             />
             {row.enabled !== false
               && row.name
@@ -391,6 +392,7 @@ const RequestHeaders = ({ item, collection, addHeaderText }) => {
               collection={collection}
               item={item}
               placeholder={!value ? 'Value' : ''}
+              disableLinkAware
             />
           )
     },

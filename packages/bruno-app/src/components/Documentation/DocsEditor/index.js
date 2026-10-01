@@ -172,6 +172,7 @@ const DocsEditor = ({
             mode="gfm"
             initialScroll={initialScroll}
             onScroll={onScroll}
+            disableLinkAware
           />
         </div>
       )}

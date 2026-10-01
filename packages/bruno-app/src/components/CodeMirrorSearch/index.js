@@ -28,7 +28,6 @@ const CodeMirrorSearch = forwardRef(({ visible, editor, readOnly, onClose }, ref
   const replaceInputRef = useRef(null);
   const containerRef = useRef(null);
   const initialIndexRef = useRef(null);
-  const pendingSearchIndexRef = useRef(null);
   const rafRef = useRef(null);
 
   const debouncedSearchText = useDebounce(searchText, 250);
@@ -221,24 +220,20 @@ const CodeMirrorSearch = forwardRef(({ visible, editor, readOnly, onClose }, ref
   useEffect(() => {
     if (!editor || !visible) return;
 
-    let timeoutId;
+    // Editing the document must not run a search or move the caret — the user
+    // is typing at their own cursor. We only invalidate the cached matches
+    // (positions shifted) so the next explicit search (typing in the search
+    // input, Enter/Shift+Enter, next/prev, replace) recomputes fresh results.
     const handleChange = () => {
       docVersion.current += 1;
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        searchCacheKey.current = '';
-        const idx = pendingSearchIndexRef.current ?? 0;
-        pendingSearchIndexRef.current = null;
-        doSearch(debouncedSearchText, idx);
-      }, 100);
+      searchCacheKey.current = '';
     };
 
     editor.on('change', handleChange);
     return () => {
       editor.off('change', handleChange);
-      clearTimeout(timeoutId);
     };
-  }, [editor, visible, doSearch, debouncedSearchText]);
+  }, [editor, visible]);
 
   const handleSearchTextChange = (text) => {
     setSearchText(text);
@@ -262,15 +257,35 @@ const CodeMirrorSearch = forwardRef(({ visible, editor, readOnly, onClose }, ref
   const isDebouncing = searchText !== debouncedSearchText;
   const isReplaceDisabled = isDebouncing || !searchText.trim() || matchCount === 0;
 
+  // Explicit navigation (Enter/Shift+Enter, next/prev buttons) is the only
+  // trigger that refreshes matches after an edit. Recompute here when the cache
+  // was invalidated so the step uses fresh, correct lengths.
+  const getFreshMatches = useCallback(() => {
+    if (!editor || !debouncedSearchText) return [];
+    const key = createCacheKey(docVersion.current, debouncedSearchText, regex, caseSensitive, wholeWord);
+    if (key === searchCacheKey.current && searchMatches.current.length) {
+      return searchMatches.current;
+    }
+    const matches = findSearchMatches(editor, debouncedSearchText, regex, caseSensitive, wholeWord);
+    searchMatches.current = matches;
+    searchCacheKey.current = key;
+    setMatchCount(matches.length);
+    return matches;
+  }, [editor, debouncedSearchText, regex, caseSensitive, wholeWord]);
+
   const handleNext = () => {
-    if (isDebouncing || !searchMatches.current || !searchMatches.current.length) return;
-    const next = (matchIndex + 1) % searchMatches.current.length;
+    if (isDebouncing) return;
+    const matches = getFreshMatches();
+    if (!matches.length) return;
+    const next = (currentMatchIndex.current + 1) % matches.length;
     doSearch(debouncedSearchText, next, null, true);
   };
 
   const handlePrev = () => {
-    if (isDebouncing || !searchMatches.current || !searchMatches.current.length) return;
-    const prev = (matchIndex - 1 + searchMatches.current.length) % searchMatches.current.length;
+    if (isDebouncing) return;
+    const matches = getFreshMatches();
+    if (!matches.length) return;
+    const prev = (currentMatchIndex.current - 1 + matches.length) % matches.length;
     doSearch(debouncedSearchText, prev, null, true);
   };
 
@@ -288,7 +303,6 @@ const CodeMirrorSearch = forwardRef(({ visible, editor, readOnly, onClose }, ref
       (m) => m.from.line > endLine || (m.from.line === endLine && m.from.ch >= endCh)
     );
     const resolvedNextIdx = nextIdx >= 0 ? nextIdx : 0;
-    pendingSearchIndexRef.current = resolvedNextIdx;
     doSearch(debouncedSearchText, resolvedNextIdx, null, true);
   }, [isReplaceDisabled, editor, matchIndex, replaceText, debouncedSearchText, regex, caseSensitive, wholeWord, doSearch]);
 

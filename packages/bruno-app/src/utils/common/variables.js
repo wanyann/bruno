@@ -1,6 +1,14 @@
 import { variableNameRegex } from './regex';
 
 /**
+ * Checks whether a value is a variable reference, i.e. it starts with `{`.
+ * Leading whitespace is ignored so `"  {{token}}"` is still treated as a reference.
+ * Used to skip masking/redaction of secret fields whose value is a variable.
+ */
+export const startsWithVariableReference = (value) =>
+  typeof value === 'string' && value.trimStart().startsWith('{');
+
+/**
  * Returns the list of invalid variable names from a variables array.
  * Skips empty/placeholder names (empty string or whitespace-only).
  */

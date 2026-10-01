@@ -12,6 +12,7 @@ import {
   collectionName,
   getTabIndex,
   modifier,
+  moveTabModifier,
   openKeybindingsTab,
   openRequest,
   pressShortcut,
@@ -595,7 +596,7 @@ test.describe('Shortcut Keys - BOUND_ACTIONS', () => {
     });
 
     test.describe('SHORTCUT: Move Tab Left', () => {
-      test('Move Tab Left default (Cmd/Ctrl+[)', async ({ pageWithUserData: page }) => {
+      test('Move Tab Left default (Control+[ / Alt+[)', async ({ pageWithUserData: page }) => {
         await openRequest(page, collectionName, 'req-7', { persist: true });
         await openRequest(page, collectionName, 'req-8', { persist: true });
         await openRequest(page, collectionName, 'req-9', { persist: true });
@@ -605,13 +606,13 @@ test.describe('Shortcut Keys - BOUND_ACTIONS', () => {
         const totalTabs = await tabs.count();
         await expect(tabs.nth(totalTabs - 1)).toHaveText(/req-9/);
 
-        // Press Cmd/Ctrl+[ → req-9 moves left, req-8 becomes last
-        await pressShortcut(page, modifier, 'BracketLeft');
+        // Press move-tab-left default → req-9 moves left, req-8 becomes last
+        await pressShortcut(page, moveTabModifier, 'BracketLeft');
         await expect(tabs.nth(totalTabs - 1)).toHaveText(/req-8/, { timeout: 3000 });
         await expect(tabs.nth(totalTabs - 2)).toHaveText(/req-9/);
 
         // Press again → req-9 moves one more position left
-        await pressShortcut(page, modifier, 'BracketLeft');
+        await pressShortcut(page, moveTabModifier, 'BracketLeft');
         await expect(tabs.nth(totalTabs - 3)).toHaveText(/req-9/, { timeout: 3000 });
       });
 
@@ -647,29 +648,29 @@ test.describe('Shortcut Keys - BOUND_ACTIONS', () => {
     });
 
     test.describe('SHORTCUT: Move Tab Right', () => {
-      test('Move Tab Right default (Cmd/Ctrl+])', async ({ pageWithUserData: page }) => {
+      test('Move Tab Right default (Control+] / Alt+])', async ({ pageWithUserData: page }) => {
         await openRequest(page, collectionName, 'req-6', { persist: true });
         await openRequest(page, collectionName, 'req-7', { persist: true });
         await openRequest(page, collectionName, 'req-8', { persist: true });
         await openRequest(page, collectionName, 'req-9', { persist: true });
 
         // Move req-9 to first position first
-        await pressShortcut(page, modifier, 'BracketLeft');
-        await pressShortcut(page, modifier, 'BracketLeft');
-        await pressShortcut(page, modifier, 'BracketLeft');
+        await pressShortcut(page, moveTabModifier, 'BracketLeft');
+        await pressShortcut(page, moveTabModifier, 'BracketLeft');
+        await pressShortcut(page, moveTabModifier, 'BracketLeft');
         await expect(page.locator('li.request-tab.active')).toHaveText(/req-9/);
         const startIndex = await getTabIndex(page, 'req-9');
         expect(startIndex).toBeGreaterThanOrEqual(0);
 
-        await pressShortcut(page, modifier, 'BracketRight');
+        await pressShortcut(page, moveTabModifier, 'BracketRight');
         const indexAfterOneMove = await getTabIndex(page, 'req-9');
         expect(indexAfterOneMove).toBeGreaterThanOrEqual(startIndex);
 
-        await pressShortcut(page, modifier, 'BracketRight');
+        await pressShortcut(page, moveTabModifier, 'BracketRight');
         const indexAfterTwoMoves = await getTabIndex(page, 'req-9');
         expect(indexAfterTwoMoves).toBeGreaterThanOrEqual(indexAfterOneMove);
 
-        await pressShortcut(page, modifier, 'BracketRight');
+        await pressShortcut(page, moveTabModifier, 'BracketRight');
         const indexAfterThreeMoves = await getTabIndex(page, 'req-9');
         expect(indexAfterThreeMoves).toBeGreaterThanOrEqual(indexAfterTwoMoves);
       });

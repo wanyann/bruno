@@ -1,4 +1,4 @@
-import reducer, { addTab, restoreTabs } from 'providers/ReduxStore/slices/tabs';
+import reducer, { addTab, restoreTabs, setRecentRequests } from 'providers/ReduxStore/slices/tabs';
 
 const COLLECTION_UID = 'col-1';
 const MOCK_SERVER_UID = 'mock-server-1';
@@ -99,5 +99,41 @@ describe('tabs mock-server dedup', () => {
     expect(state.tabs).toHaveLength(1);
     expect(state.tabs[0].mockServerUid).toBe(MOCK_SERVER_UID);
     expect(state.activeTabUid).toBe(MOCK_SERVER_UID);
+  });
+});
+
+describe('recentRequests excludes transient requests', () => {
+  it('does not record a transient request when its tab is opened', () => {
+    const state = reducer(undefined, addTab({
+      uid: 'req-1',
+      collectionUid: COLLECTION_UID,
+      type: 'http-request',
+      pathname: '/home/user/Library/Application Support/Bruno/tmp/transient/bruno-abc/Untitled 1.yml'
+    }));
+
+    expect(state.recentRequests).toHaveLength(0);
+  });
+
+  it('records a normal (non-transient) request', () => {
+    const state = reducer(undefined, addTab({
+      uid: 'req-2',
+      collectionUid: COLLECTION_UID,
+      type: 'http-request',
+      pathname: '/home/user/collections/demo/req.yml'
+    }));
+
+    expect(state.recentRequests).toHaveLength(1);
+    expect(state.recentRequests[0].pathname).toBe('/home/user/collections/demo/req.yml');
+  });
+
+  it('drops persisted transient entries when restoring from a snapshot', () => {
+    const state = reducer(undefined, setRecentRequests([
+      { uid: 'a', collectionUid: COLLECTION_UID, pathname: '/home/user/collections/demo/a.yml' },
+      { uid: 'b', collectionUid: COLLECTION_UID, pathname: '/home/user/Library/Application Support/Bruno/tmp/transient/bruno-abc/Untitled 1.yml' },
+      { uid: 'c', collectionUid: COLLECTION_UID, pathname: 'C:\\Users\\me\\AppData\\Roaming\\Bruno\\tmp\\transient\\bruno-xyz\\Untitled 1.yml' }
+    ]));
+
+    expect(state.recentRequests).toHaveLength(1);
+    expect(state.recentRequests[0].uid).toBe('a');
   });
 });

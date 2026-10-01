@@ -11,8 +11,10 @@ export const KEY_BINDING_SECTIONS = [
       switchToLastTab: { mac: 'command+bind+9', windows: 'ctrl+bind+9', name: 'Switch to Last Tab' }, // D
       switchToPreviousTab: { mac: 'shift+bind+command+bind+[', windows: 'shift+bind+ctrl+bind+[', name: 'Switch to Previous Tab' }, // D
       switchToNextTab: { mac: 'shift+bind+command+bind+]', windows: 'shift+bind+ctrl+bind+]', name: 'Switch to Next Tab' },
-      moveTabLeft: { mac: 'command+bind+[', windows: 'ctrl+bind+[', name: 'Move Tab Left' }, // D
-      moveTabRight: { mac: 'command+bind+]', windows: 'ctrl+bind+]', name: 'Move Tab Right' }, // D
+      moveTabLeft: { mac: 'ctrl+bind+[', windows: 'alt+bind+[', name: 'Move Tab Left' }, // D
+      moveTabRight: { mac: 'ctrl+bind+]', windows: 'alt+bind+]', name: 'Move Tab Right' }, // D
+      historyBack: { mac: 'command+bind+[', windows: 'ctrl+bind+[', name: 'Go Back' }, // D
+      historyForward: { mac: 'command+bind+]', windows: 'ctrl+bind+]', name: 'Go Forward' }, // D
       switchToTab1: { mac: 'command+bind+1', windows: 'ctrl+bind+1', name: 'Switch to Tab at Position', readOnly: true, hidden: true },
       switchToTab2: { mac: 'command+bind+2', windows: 'ctrl+bind+2', name: 'Switch to Tab at Position', readOnly: true, hidden: true },
       switchToTab3: { mac: 'command+bind+3', windows: 'ctrl+bind+3', name: 'Switch to Tab at Position', readOnly: true, hidden: true },
@@ -66,7 +68,8 @@ export const KEY_BINDING_SECTIONS = [
   {
     heading: 'Developer Tool',
     bindings: {
-      openTerminal: { mac: 'command+bind+t', windows: 'ctrl+bind+t', name: 'Open in Terminal' } // D
+      openTerminal: { mac: 'command+bind+t', windows: 'ctrl+bind+t', name: 'Open in Terminal' }, // D
+      toggleConsole: { mac: 'alt+bind+c', windows: 'alt+bind+c', name: 'Toggle Console' } // D
     }
   },
   {

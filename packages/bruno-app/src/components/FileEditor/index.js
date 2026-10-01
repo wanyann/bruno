@@ -51,6 +51,7 @@ const FileEditor = ({ item, collection }) => {
         font={get(preferences, 'font.codeFont', 'default')}
         initialScroll={scroll}
         onScroll={setScroll}
+        disableLinkAware
       />
       <IconDeviceFloppy
         onClick={onSave}

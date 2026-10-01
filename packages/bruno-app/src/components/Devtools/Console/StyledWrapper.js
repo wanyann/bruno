@@ -8,6 +8,11 @@ const StyledWrapper = styled.div`
   display: flex;
   flex-direction: column;
 
+  &:focus,
+  &:focus-visible {
+    outline: none;
+  }
+
   .console-header {
     display: flex;
     align-items: center;

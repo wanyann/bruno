@@ -93,6 +93,7 @@ const Headers = ({ collection, folder }) => {
           autocomplete={headerAutoCompleteList}
           collection={collection}
           placeholder={!value ? 'Name' : ''}
+          disableLinkAware
         />
       )
     },
@@ -110,6 +111,7 @@ const Headers = ({ collection, folder }) => {
           item={folder}
           autocomplete={MimeTypes}
           placeholder={!value ? 'Value' : ''}
+          disableLinkAware
         />
       )
     },

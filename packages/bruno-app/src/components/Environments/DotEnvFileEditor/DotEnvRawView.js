@@ -24,6 +24,7 @@ const DotEnvRawView = ({
           mode="text/plain"
           enableVariableHighlighting={false}
           enableBrunoVarInfo={false}
+          disableLinkAware
         />
       </div>
       <div className="button-container">

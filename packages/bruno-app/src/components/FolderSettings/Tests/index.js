@@ -49,6 +49,7 @@ const Tests = ({ collection, folder }) => {
           theme={displayedTheme}
           onEdit={onEdit}
           mode="javascript"
+          disableLinkAware
           onSave={handleSave}
           font={get(preferences, 'font.codeFont', 'default')}
           fontSize={get(preferences, 'font.codeFontSize')}

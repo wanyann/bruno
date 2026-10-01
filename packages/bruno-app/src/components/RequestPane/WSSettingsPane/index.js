@@ -85,6 +85,7 @@ const WSSettingsPane = ({ item, collection }) => {
                 theme={storedTheme}
                 onChange={(newValue) => updateSetting('timeout', newValue)}
                 collection={collection}
+                disableLinkAware
               />
             </ToolHint>
           </div>
@@ -123,6 +124,7 @@ const WSSettingsPane = ({ item, collection }) => {
                 theme={storedTheme}
                 onChange={(newValue) => updateSetting('keepAliveInterval', newValue)}
                 collection={collection}
+                disableLinkAware
               />
             </ToolHint>
           </div>

@@ -280,6 +280,7 @@ export const SingleWSMessage = ({
             docKey={`${item.uid}:ws-msg:${message.uid ?? index}`}
             containScroll={true}
             onSearchBarVisibilityChange={setIsSearchBarVisible}
+            disableLinkAware
           />
         </div>
       )}

@@ -10,9 +10,11 @@ import each from 'lodash/each';
 import { findCollectionByUid, findItemInCollection, flattenItems, isItemARequest, hasRequestChanges, findEnvironmentInCollection } from 'utils/collections';
 import { addTab, focusTab, reorderTabs } from 'providers/ReduxStore/slices/tabs';
 import { saveMultipleRequests, saveMultipleCollections, saveMultipleFolders, saveEnvironment, reopenClosedTab } from 'providers/ReduxStore/slices/collections/actions';
+import { navigateBack, navigateForward } from 'providers/ReduxStore/slices/navigationHistoryActions';
 import { toggleSidebarCollapse, savePreferences } from 'providers/ReduxStore/slices/app';
 import { setLocalStorageValue, SIDEBAR_COLLAPSED_KEY } from 'utils/common/localStorage';
 import { openDevtoolsAndSwitchToTerminal } from 'utils/terminal';
+import { toggleDevtoolsConsole } from 'utils/devtools';
 import { isEnvironmentValidationError } from 'utils/environments';
 import toast from 'react-hot-toast';
 import { getKeyBindingsForActionAllOS } from './keyMappings';
@@ -26,6 +28,8 @@ export const HotkeysProvider = (props) => {
   const activeTabUid = useSelector((state) => state.tabs.activeTabUid);
   const userKeyBindings = useSelector((state) => state.app.preferences?.keyBindings);
   const keybindingsEnabled = useSelector((state) => state.app.preferences?.keybindingsEnabled !== false);
+  const isDevtoolsOpen = useSelector((state) => state.logs.isConsoleOpen);
+  const devtoolsActiveTab = useSelector((state) => state.logs.activeTab);
   const [showNewRequestModal, setShowNewRequestModal] = useState(false);
   const [showGlobalSearchModal, setShowGlobalSearchModal] = useState(false);
   const [showSaveRequestsModal, setShowSaveRequestsModal] = useState(false);
@@ -330,6 +334,18 @@ export const HotkeysProvider = (props) => {
     };
   }, [focusedSidebarPath, activeTabUid, tabs, collections, activeWorkspace, dispatch, userKeyBindings, keybindingsEnabled]);
 
+  // Toggle the in-app Devtools Console panel
+  useEffect(() => {
+    bindAction('toggleConsole', (e) => {
+      toggleDevtoolsConsole(dispatch, { isConsoleOpen: isDevtoolsOpen, activeTab: devtoolsActiveTab });
+      return false;
+    });
+
+    return () => {
+      unbindAction('toggleConsole');
+    };
+  }, [isDevtoolsOpen, devtoolsActiveTab, dispatch, userKeyBindings, keybindingsEnabled]);
+
   // Move tab left (active-collection-tabs-only)
   useEffect(() => {
     bindAction('moveTabLeft', (e) => {
@@ -359,6 +375,30 @@ export const HotkeysProvider = (props) => {
       unbindAction('moveTabRight');
     };
   }, [activeTabUid, tabs, dispatch, userKeyBindings, keybindingsEnabled]);
+
+  // Navigate back through the session history
+  useEffect(() => {
+    bindAction('historyBack', (e) => {
+      dispatch(navigateBack());
+      return false;
+    });
+
+    return () => {
+      unbindAction('historyBack');
+    };
+  }, [dispatch, userKeyBindings, keybindingsEnabled]);
+
+  // Navigate forward through the session history
+  useEffect(() => {
+    bindAction('historyForward', (e) => {
+      dispatch(navigateForward());
+      return false;
+    });
+
+    return () => {
+      unbindAction('historyForward');
+    };
+  }, [dispatch, userKeyBindings, keybindingsEnabled]);
 
   // Open preferences
   useEffect(() => {

@@ -290,7 +290,7 @@ describe('CodeMirrorSearch', () => {
   });
 
   describe('document change (undo/redo/edit)', () => {
-    it('re-runs search and updates count when document changes', () => {
+    it('does not re-run search or move the caret when the document changes', () => {
       let changeHandler;
       const matches = [
         { from: { line: 0, ch: 0 }, to: { line: 0, ch: 7 } },
@@ -305,16 +305,48 @@ describe('CodeMirrorSearch', () => {
       typeSearch('console');
       expect(screen.getByTestId('codemirror-search-result-count')).toHaveTextContent('1 / 2');
 
-      // Simulate undo — document reverts, now no matches
-      editor.getSearchCursor.mockImplementation(() => {
-        const i = -1;
-        return { findNext: () => false, from: () => undefined, to: () => undefined };
+      const setSelectionCallsBefore = editor.setSelection.mock.calls.length;
+      const getSearchCursorCallsBefore = editor.getSearchCursor.mock.calls.length;
+
+      // Simulate an edit typed at the user's caret — this must not search or
+      // hijack the selection.
+      act(() => {
+        changeHandler();
+        jest.advanceTimersByTime(250);
       });
+
+      expect(editor.setSelection.mock.calls.length).toBe(setSelectionCallsBefore);
+      expect(editor.getSearchCursor.mock.calls.length).toBe(getSearchCursorCallsBefore);
+      expect(screen.getByTestId('codemirror-search-result-count')).toHaveTextContent('1 / 2');
+    });
+
+    it('recomputes matches on Enter after an edit invalidated the cache', () => {
+      let changeHandler;
+      const matches = [
+        { from: { line: 0, ch: 0 }, to: { line: 0, ch: 7 } },
+        { from: { line: 1, ch: 0 }, to: { line: 1, ch: 7 } }
+      ];
+      const editor = makeMockEditor(matches);
+      editor.on = jest.fn((event, handler) => { if (event === 'change') changeHandler = handler; });
+      editor.off = jest.fn();
+
+      renderSearch({ editor });
+      typeSearch('console');
+      expect(screen.getByTestId('codemirror-search-result-count')).toHaveTextContent('1 / 2');
+
+      // The edit removed the remaining matches in the document.
+      editor.getSearchCursor.mockImplementation(() => ({
+        findNext: () => false,
+        from: () => undefined,
+        to: () => undefined
+      }));
 
       act(() => {
         changeHandler();
-        jest.advanceTimersByTime(100);
       });
+
+      // Enter forces a fresh scan and reflects the new (empty) state.
+      fireEvent.keyDown(screen.getByTestId('codemirror-search-input'), { key: 'Enter' });
 
       expect(screen.getByTestId('codemirror-search-result-count')).toHaveTextContent('0 results');
     });

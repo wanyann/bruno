@@ -168,6 +168,7 @@ const Assertions = ({ item, collection }) => {
             collection={collection}
             item={item}
             placeholder={!value ? 'Value' : ''}
+            disableLinkAware
           />
         );
       }

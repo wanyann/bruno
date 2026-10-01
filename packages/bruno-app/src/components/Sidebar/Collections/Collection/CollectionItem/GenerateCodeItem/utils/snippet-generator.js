@@ -32,6 +32,19 @@ const addCurlAuthFlags = (curlCommand, auth) => {
   return curlCommand;
 };
 
+// Builds the request-bearing item used by code generation for a normal
+// (non-example) request. Uses the draft when present (so unsaved/new requests
+// generate from their live values) and resolves inherited auth up the folder
+// chain. Shared by the Generate Code modal and the left-click "copy as cURL"
+// action so both always produce the same snippet.
+const buildRequestItemForCodegen = (item, collection) => ({
+  ...item,
+  request: {
+    ...(item.draft?.request ?? item.request),
+    auth: resolveInheritedAuth(item, collection).auth
+  }
+});
+
 const generateSnippet = async ({ language, item, collection, shouldInterpolate = false }) => {
   try {
     // Get HTTPSnippet dynamically so mocks can be applied in tests
@@ -127,5 +140,6 @@ const generateSnippet = async ({ language, item, collection, shouldInterpolate =
 };
 
 export {
-  generateSnippet
+  generateSnippet,
+  buildRequestItemForCodegen
 };

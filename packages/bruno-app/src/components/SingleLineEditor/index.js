@@ -7,6 +7,7 @@ import { resolveLinkClickHandler } from 'utils/codemirror/linkClickHandler';
 import { getAllVariables, getRequestTypeFromCollectionPresets } from 'utils/collections';
 import { defineCodeMirrorBrunoVariablesMode } from 'utils/common/codemirror';
 import { MaskedEditor } from 'utils/common/masked-editor';
+import { startsWithVariableReference } from 'utils/common/variables';
 import StyledWrapper from './StyledWrapper';
 
 const CodeMirror = require('codemirror');
@@ -96,17 +97,21 @@ class SingleLineEditor extends Component {
      * Must run before setValue() below, or it misses the 'change' event setValue() fires
      * and never marks the link. disableLinkAwareClick opts a field out of the "open as new
      * request" click (e.g. the URL bar) - it still marks URLs and Cmd/Ctrl+Click still opens
-     * them externally, matching Bruno's pre-existing URL bar behaviour.
+     * them externally, matching Bruno's pre-existing URL bar behaviour. disableLinkAware opts
+     * a field out of link detection entirely, so URLs stay plain text.
      */
-    setupLinkAware(this.editor, {
-      onLinkClick: this.props.disableLinkAwareClick
-        ? undefined
-        : resolveLinkClickHandler(this.props.item, this.props.collection)
-    });
+    if (!this.props.disableLinkAware) {
+      setupLinkAware(this.editor, {
+        onLinkClick: this.props.disableLinkAwareClick
+          ? undefined
+          : resolveLinkClickHandler(this.props.item, this.props.collection)
+      });
+    }
     this._linkAwareItemType = this.props.item?.type;
     this._linkAwareCollectionUid = this.props.collection?.uid;
     this._linkAwarePresetType = getRequestTypeFromCollectionPresets(this.props.collection);
     this._linkAwareDisabled = this.props.disableLinkAwareClick;
+    this._linkAwareFullyDisabled = this.props.disableLinkAware;
 
     this.editor.setValue(String(this.props.value ?? ''));
     this.editor.on('change', this._onEdit);
@@ -134,7 +139,11 @@ class SingleLineEditor extends Component {
     if (typeof enabled !== 'boolean') return;
 
     if (enabled == true) {
-      if (!this.maskedEditor) this.maskedEditor = new MaskedEditor(this.editor, '*');
+      if (!this.maskedEditor) {
+        this.maskedEditor = new MaskedEditor(this.editor, '*', {
+          shouldMask: (value) => !startsWithVariableReference(value)
+        });
+      }
       this.maskedEditor.enable();
     } else {
       if (this.maskedEditor) {
@@ -209,22 +218,27 @@ class SingleLineEditor extends Component {
     const itemType = this.props.item?.type;
     const collectionUid = this.props.collection?.uid;
     const presetType = getRequestTypeFromCollectionPresets(this.props.collection);
+    const linkAwareFullyDisabled = this.props.disableLinkAware;
     if (
       itemType !== this._linkAwareItemType
       || collectionUid !== this._linkAwareCollectionUid
       || presetType !== this._linkAwarePresetType
       || this.props.disableLinkAwareClick !== this._linkAwareDisabled
+      || linkAwareFullyDisabled !== this._linkAwareFullyDisabled
     ) {
       this._linkAwareItemType = itemType;
       this._linkAwareCollectionUid = collectionUid;
       this._linkAwarePresetType = presetType;
       this._linkAwareDisabled = this.props.disableLinkAwareClick;
+      this._linkAwareFullyDisabled = linkAwareFullyDisabled;
       this.editor._destroyLinkAware?.();
-      setupLinkAware(this.editor, {
-        onLinkClick: this.props.disableLinkAwareClick
-          ? undefined
-          : resolveLinkClickHandler(this.props.item, this.props.collection)
-      });
+      if (!linkAwareFullyDisabled) {
+        setupLinkAware(this.editor, {
+          onLinkClick: this.props.disableLinkAwareClick
+            ? undefined
+            : resolveLinkClickHandler(this.props.item, this.props.collection)
+        });
+      }
       this.editor.refresh();
     }
     if (this.props.theme !== prevProps.theme && this.editor) {

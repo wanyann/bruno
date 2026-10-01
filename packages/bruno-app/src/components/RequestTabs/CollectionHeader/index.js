@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   IconCategory,
   IconBox,
-  IconChevronDown,
   IconRun,
   IconEye,
   IconSettings,
@@ -28,7 +27,8 @@ import { showInFolder } from 'providers/ReduxStore/slices/collections/actions';
 import { toggleCollectionFileMode } from 'providers/ReduxStore/slices/collections';
 import { toggleAiSidebar } from 'providers/ReduxStore/slices/chat';
 import { showMigrateToYmlModal } from 'providers/ReduxStore/slices/collection-migration';
-import { findItemInCollection, findItemInCollectionByPathname } from 'utils/collections';
+import { findItemInCollection, findItemInCollectionByPathname, getTreePathFromCollectionToItem } from 'utils/collections';
+import { getTabDisplayName } from 'utils/tabNames';
 import find from 'lodash/find';
 import get from 'lodash/get';
 import { addTab, focusTab, setTabAppPreview } from 'providers/ReduxStore/slices/tabs';
@@ -94,6 +94,59 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
   // Request/App/File mode toggle.
   const appAvailable = isHttpRequestActive && get(activeItemSource, 'app.enabled', false) === true;
   const appEnabled = appAvailable && focusedTab?.appPreview !== false;
+
+  // Breadcrumb: collection > ancestor folders > tab name.
+  const folderChain = useMemo(() => {
+    if (!collection || !focusedTab) return [];
+
+    // For a request-family tab, walk up from the request to the collection root.
+    if (activeItem) {
+      return getTreePathFromCollectionToItem(collection, activeItem)
+        .filter((entry) => entry?.type === 'folder');
+    }
+
+    // For a folder-settings tab, walk up from that folder.
+    if (focusedTab.type === 'folder-settings') {
+      const folder = (focusedTab.folderUid && findItemInCollection(collection, focusedTab.folderUid))
+        || (focusedTab.uid && findItemInCollection(collection, focusedTab.uid))
+        || (focusedTab.pathname ? findItemInCollectionByPathname(collection, focusedTab.pathname) : null);
+      if (!folder) return [];
+      return getTreePathFromCollectionToItem(collection, folder)
+        .filter((entry) => entry?.type === 'folder');
+    }
+
+    return [];
+  }, [collection, focusedTab, activeItem]);
+
+  const activeFolder = useMemo(() => {
+    if (!collection || !focusedTab || focusedTab.type !== 'folder-settings') return null;
+    return (focusedTab.folderUid && findItemInCollection(collection, focusedTab.folderUid))
+      || (focusedTab.uid && findItemInCollection(collection, focusedTab.uid))
+      || (focusedTab.pathname ? findItemInCollectionByPathname(collection, focusedTab.pathname) : null);
+  }, [collection, focusedTab]);
+
+  const activeTabName = focusedTab
+    ? getTabDisplayName({ tab: focusedTab, item: activeItem, folder: activeFolder })
+    : '';
+
+  // Open (or focus) a folder's settings tab. Navigation history is recorded by the
+  // navigation-history middleware, matching a normal tab transition.
+  const handleOpenFolder = (folder) => {
+    if (!folder?.uid || !collection) return;
+    const existing = tabs.find((t) => t.uid === folder.uid && t.type === 'folder-settings');
+    if (existing) {
+      dispatch(focusTab({ uid: existing.uid }));
+      return;
+    }
+    dispatch(
+      addTab({
+        uid: folder.uid,
+        collectionUid: collection.uid,
+        type: 'folder-settings',
+        pathname: folder.pathname
+      })
+    );
+  };
 
   const handleToggleAppMode = (enabled) => {
     if (isHttpRequestActive) {
@@ -540,158 +593,187 @@ const CollectionHeader = ({ collection, isScratchCollection }) => {
       )}
 
       <div className="flex items-center justify-between gap-2 py-2 px-4">
-        {/* Left side: Switcher dropdown or rename input */}
-        <div className="collection-switcher">
-          {isRenamingWorkspace ? (
-            <div className="workspace-rename-container" ref={workspaceRenameContainerRef}>
-              <DisplayIcon size={18} strokeWidth={1.5} className="cursor-pointer display-icon" />
-              <div className="workspace-input-wrapper">
-                <input
-                  ref={workspaceNameInputRef}
-                  type="text"
-                  className="workspace-name-input"
-                  value={workspaceNameInput}
-                  onChange={handleWorkspaceNameChange}
-                  onKeyDown={handleWorkspaceNameKeyDown}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck="false"
-                />
-                {currentWorkspace?.isCreating && (
+        {/* Left side: switcher dropdown / rename input + tab breadcrumb */}
+        <div className="header-left flex items-center min-w-0">
+          <div className="collection-switcher">
+            {isRenamingWorkspace ? (
+              <div className="workspace-rename-container" ref={workspaceRenameContainerRef}>
+                <DisplayIcon size={18} strokeWidth={1.5} className="cursor-pointer display-icon" />
+                <div className="workspace-input-wrapper">
+                  <input
+                    ref={workspaceNameInputRef}
+                    type="text"
+                    className="workspace-name-input"
+                    value={workspaceNameInput}
+                    onChange={handleWorkspaceNameChange}
+                    onKeyDown={handleWorkspaceNameKeyDown}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                  />
+                  {currentWorkspace?.isCreating && (
+                    <button
+                      className="cog-btn"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={handleOpenAdvancedCreate}
+                      title="Advanced options"
+                    >
+                      <IconSettings size={13} strokeWidth={1.5} />
+                    </button>
+                  )}
+                </div>
+                <div className="inline-actions">
                   <button
-                    className="cog-btn"
+                    className="inline-action-btn save"
+                    onClick={handleSaveWorkspaceRename}
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={handleOpenAdvancedCreate}
-                    title="Advanced options"
+                    title={currentWorkspace?.isCreating ? 'Create' : 'Save'}
                   >
-                    <IconSettings size={13} strokeWidth={1.5} />
+                    <IconCheck size={14} strokeWidth={2} />
                   </button>
+                  <button
+                    className="inline-action-btn cancel"
+                    onClick={handleCancelWorkspaceRename}
+                    onMouseDown={(e) => e.preventDefault()}
+                    title="Cancel"
+                  >
+                    <IconX size={14} strokeWidth={2} />
+                  </button>
+                </div>
+                {workspaceNameError && (
+                  <span className="workspace-error">{workspaceNameError}</span>
                 )}
               </div>
-              <div className="inline-actions">
-                <button
-                  className="inline-action-btn save"
-                  onClick={handleSaveWorkspaceRename}
-                  onMouseDown={(e) => e.preventDefault()}
-                  title={currentWorkspace?.isCreating ? 'Create' : 'Save'}
+            ) : (
+              <div className="flex flex-row justify-center items-center gap-x-1">
+                <DisplayIcon size={18} strokeWidth={1.5} className="cursor-pointer display-icon" onClick={handleDisplayIconClick} />
+                <Dropdown
+                  placement="bottom-start"
+                  onCreate={onSwitcherCreate}
+                  appendTo={() => document.body}
+                  icon={(
+                    <button className="switcher-trigger">
+                      <span data-testid="workspace-switcher-name" className={classNames('switcher-name', { 'scratch-collection': isScratchCollection })}>{displayName}</span>
+                    </button>
+                  )}
                 >
-                  <IconCheck size={14} strokeWidth={2} />
-                </button>
-                <button
-                  className="inline-action-btn cancel"
-                  onClick={handleCancelWorkspaceRename}
-                  onMouseDown={(e) => e.preventDefault()}
-                  title="Cancel"
-                >
-                  <IconX size={14} strokeWidth={2} />
-                </button>
+                  <div className="max-w-124 overflow-hidden">
+                    {currentWorkspace && (
+                      <>
+                        <div className="label-item">Workspace</div>
+                        <div
+                          className={classNames('dropdown-item', {
+                            'dropdown-item-active': isScratchCollection
+                          })}
+                          onClick={() => handleSwitchToWorkspace(currentWorkspace.uid)}
+                        >
+                          <div className="dropdown-icon">
+                            <IconCategory size={16} strokeWidth={1.5} />
+                          </div>
+                          <span className="dropdown-label collection-header-dropdown-label">
+                            {currentWorkspace.name || 'Untitled Workspace'}
+                          </span>
+                          {workspaceTabCount > 0 && (
+                            <span className="dropdown-tab-count">{workspaceTabCount}</span>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {mountedCollections.length > 0 && (
+                      <>
+                        <div className="dropdown-separator" />
+                        <div className="label-item">Collections</div>
+                        {mountedCollections.map((col) => {
+                          const colTabCount = getTabCount(col.uid);
+                          return (
+                            <div
+                              key={col.uid}
+                              className={classNames('dropdown-item', {
+                                'dropdown-item-active': !isScratchCollection && collection.uid === col.uid
+                              })}
+                              onClick={() => handleSwitchToCollection(col)}
+                            >
+                              <div className="dropdown-icon">
+                                <IconBox size={16} strokeWidth={1.5} />
+                              </div>
+                              <span className="dropdown-label collection-header-dropdown-label">{col.name || 'Untitled Collection'}</span>
+                              {colTabCount > 0 && (
+                                <span className="dropdown-tab-count">{colTabCount}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
+                </Dropdown>
               </div>
-              {workspaceNameError && (
-                <span className="workspace-error">{workspaceNameError}</span>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-row justify-center items-center gap-x-1">
-              <DisplayIcon size={18} strokeWidth={1.5} className="cursor-pointer display-icon" onClick={handleDisplayIconClick} />
+            )}
+
+            {/* Workspace actions dropdown */}
+            {showWorkspaceActions && (
               <Dropdown
                 placement="bottom-start"
-                onCreate={onSwitcherCreate}
+                onCreate={onWorkspaceActionsCreate}
                 appendTo={() => document.body}
-                icon={(
-                  <button className="switcher-trigger">
-                    <span data-testid="workspace-switcher-name" className={classNames('switcher-name', { 'scratch-collection': isScratchCollection })}>{displayName}</span>
-                    <IconChevronDown size={14} strokeWidth={1.5} className="chevron" />
-                  </button>
-                )}
+                icon={<IconDots size={18} strokeWidth={1.5} data-testid="workspace-actions-trigger" className="workspace-actions-trigger" />}
               >
-                <div className="max-w-124 overflow-hidden">
-                  {currentWorkspace && (
-                    <>
-                      <div className="label-item">Workspace</div>
-                      <div
-                        className={classNames('dropdown-item', {
-                          'dropdown-item-active': isScratchCollection
-                        })}
-                        onClick={() => handleSwitchToWorkspace(currentWorkspace.uid)}
-                      >
-                        <div className="dropdown-icon">
-                          <IconCategory size={16} strokeWidth={1.5} />
-                        </div>
-                        <span className="dropdown-label collection-header-dropdown-label">
-                          {currentWorkspace.name || 'Untitled Workspace'}
-                        </span>
-                        {workspaceTabCount > 0 && (
-                          <span className="dropdown-tab-count">{workspaceTabCount}</span>
-                        )}
-                      </div>
-                    </>
-                  )}
-
-                  {mountedCollections.length > 0 && (
-                    <>
-                      <div className="dropdown-separator" />
-                      <div className="label-item">Collections</div>
-                      {mountedCollections.map((col) => {
-                        const colTabCount = getTabCount(col.uid);
-                        return (
-                          <div
-                            key={col.uid}
-                            className={classNames('dropdown-item', {
-                              'dropdown-item-active': !isScratchCollection && collection.uid === col.uid
-                            })}
-                            onClick={() => handleSwitchToCollection(col)}
-                          >
-                            <div className="dropdown-icon">
-                              <IconBox size={16} strokeWidth={1.5} />
-                            </div>
-                            <span className="dropdown-label collection-header-dropdown-label">{col.name || 'Untitled Collection'}</span>
-                            {colTabCount > 0 && (
-                              <span className="dropdown-tab-count">{colTabCount}</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
+                <div className="dropdown-item" onClick={handleRenameWorkspaceClick}>
+                  <div className="dropdown-icon">
+                    <IconEdit size={16} strokeWidth={1.5} />
+                  </div>
+                  <span>Rename</span>
+                </div>
+                <div className="dropdown-item" onClick={handleShowInFolder}>
+                  <div className="dropdown-icon">
+                    <IconFolder size={16} strokeWidth={1.5} />
+                  </div>
+                  <span>{getRevealInFolderLabel()}</span>
+                </div>
+                <div className="dropdown-item" onClick={handleExportWorkspace}>
+                  <div className="dropdown-icon">
+                    <IconUpload size={16} strokeWidth={1.5} />
+                  </div>
+                  <span>Export</span>
+                </div>
+                <div className="dropdown-item" onClick={handleCloseWorkspaceClick}>
+                  <div className="dropdown-icon">
+                    <IconX size={16} strokeWidth={1.5} />
+                  </div>
+                  <span>Close</span>
                 </div>
               </Dropdown>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* Workspace actions dropdown */}
-          {showWorkspaceActions && (
-            <Dropdown
-              placement="bottom-start"
-              onCreate={onWorkspaceActionsCreate}
-              appendTo={() => document.body}
-              icon={<IconDots size={18} strokeWidth={1.5} data-testid="workspace-actions-trigger" className="workspace-actions-trigger" />}
-            >
-              <div className="dropdown-item" onClick={handleRenameWorkspaceClick}>
-                <div className="dropdown-icon">
-                  <IconEdit size={16} strokeWidth={1.5} />
-                </div>
-                <span>Rename</span>
-              </div>
-              <div className="dropdown-item" onClick={handleShowInFolder}>
-                <div className="dropdown-icon">
-                  <IconFolder size={16} strokeWidth={1.5} />
-                </div>
-                <span>{getRevealInFolderLabel()}</span>
-              </div>
-              <div className="dropdown-item" onClick={handleExportWorkspace}>
-                <div className="dropdown-icon">
-                  <IconUpload size={16} strokeWidth={1.5} />
-                </div>
-                <span>Export</span>
-              </div>
-              <div className="dropdown-item" onClick={handleCloseWorkspaceClick}>
-                <div className="dropdown-icon">
-                  <IconX size={16} strokeWidth={1.5} />
-                </div>
-                <span>Close</span>
-              </div>
-            </Dropdown>
+          {/* Breadcrumb: collection > ancestor folders > tab name */}
+          {(folderChain.length > 0 || activeTabName) && (
+            <div className="tab-breadcrumb flex items-center min-w-0" data-testid="tab-breadcrumb">
+              {folderChain.map((folder) => (
+                <span key={folder.uid} className="breadcrumb-group flex items-center">
+                  <span className="breadcrumb-separator" aria-hidden="true">&gt;</span>
+                  <button
+                    type="button"
+                    className="breadcrumb-folder"
+                    data-testid={`breadcrumb-folder-${folder.uid}`}
+                    onClick={() => handleOpenFolder(folder)}
+                    title={folder.name}
+                  >
+                    {folder.name}
+                  </button>
+                </span>
+              ))}
+              {activeTabName && (
+                <span className="breadcrumb-group flex items-center">
+                  <span className="breadcrumb-separator" aria-hidden="true">&gt;</span>
+                  <span className="breadcrumb-tab-name" data-testid="tab-breadcrumb-name" title={activeTabName}>
+                    {activeTabName}
+                  </span>
+                </span>
+              )}
+            </div>
           )}
         </div>
 

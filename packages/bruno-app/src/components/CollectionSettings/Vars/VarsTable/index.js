@@ -86,6 +86,7 @@ const VarsTable = ({ collection, vars, varType, initialScroll = 0, isDraft }) =>
               onSave={onSave}
               onChange={onChange}
               collection={collection}
+              disableLinkAware
               placeholder={value == null || (typeof value === 'string' && value.trim() === '') ? (varType === 'request' ? 'Value' : 'Expr') : ''}
             />
           )}

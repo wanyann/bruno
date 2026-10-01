@@ -220,6 +220,7 @@ const SingleGrpcMessage = ({ message, item, collection, index, methodType, handl
           enableVariableHighlighting={true}
           initialScroll={grpcScroll}
           onScroll={setGrpcScroll}
+          disableLinkAware
         />
       </div>
     </div>

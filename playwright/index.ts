@@ -295,6 +295,9 @@ export const test = baseTest.extend<
             DISABLE_SAMPLE_COLLECTION_IMPORT: 'true',
             PLAYWRIGHT: 'true',
             DISABLE_SINGLE_INSTANCE: 'true',
+            // Run with the window hidden so the app never pops up on screen.
+            // Set BRUNO_TEST_HEADLESS=false to watch the run.
+            BRUNO_TEST_HEADLESS: process.env.BRUNO_TEST_HEADLESS ?? 'true',
             ...dotEnv
           }
         });

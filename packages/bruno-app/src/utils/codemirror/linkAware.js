@@ -307,6 +307,15 @@ function setupLinkAware(editor, options = {}) {
     editorWrapper.removeEventListener('mouseover', boundHandleMouseEnter);
     editorWrapper.removeEventListener('mouseout', boundHandleMouseLeave);
     editorWrapper.classList.remove(linkClickClass);
+
+    // Remove any existing link marks so the text is no longer styled/clickable.
+    editor.operation(() => {
+      editor.getAllMarks().forEach((mark) => {
+        if (mark.className === linkClass) {
+          mark.clear();
+        }
+      });
+    });
   };
 }
 

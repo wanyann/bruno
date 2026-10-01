@@ -183,6 +183,7 @@ const AssertionRow = ({
             onRun={handleRun}
             collection={collection}
             item={item}
+            disableLinkAware
           />
         ) : (
           <input type="text" className="cursor-default" disabled />

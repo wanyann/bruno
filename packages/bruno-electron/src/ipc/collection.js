@@ -27,6 +27,7 @@ const brunoConverters = require('@usebruno/converters');
 const { postmanToBruno } = brunoConverters;
 const { cookiesStore } = require('../store/cookies');
 const { parseLargeRequestWithRedaction } = require('../utils/parse');
+const { openExternal } = require('../utils/open-external');
 const { getWsClient } = require('../ipc/network/ws-event-handlers');
 const { hasSubDirectories } = require('../utils/filesystem');
 const { transformProxyConfig } = require('@usebruno/requests');
@@ -2914,7 +2915,9 @@ const registerMainEventHandlers = (mainWindow) => {
 
   ipcMain.on('main:open-docs', () => {
     const docsURL = 'https://docs.usebruno.com';
-    shell.openExternal(docsURL);
+    openExternal(docsURL).catch((err) => {
+      console.error('Failed to open docs URL:', err);
+    });
   });
 
   ipcMain.on('main:collection-opened', async (win, pathname, uid, brunoConfig) => {

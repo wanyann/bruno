@@ -1,5 +1,5 @@
 import { Page, test } from '../../playwright';
-import { buildCommonLocators, closeAllCollections, LINK_AWARE_COLLECTION_NAME as COLLECTION_NAME, expectLinkOpensExternally, expectLinkOpensRequest, expectNoLink, expectRichTextLinkOpensExternally, expectRichTextLinkOpensRequest, LINK_CLICK_MODIFIER, openCollectionFromDialog, openRequest, selectRequestPaneTab } from '../utils/page';
+import { buildCommonLocators, closeAllCollections, LINK_AWARE_COLLECTION_NAME as COLLECTION_NAME, expectNoLink, expectNoLinkMark, expectRichTextLinkOpensExternally, expectRichTextLinkOpensRequest, LINK_CLICK_MODIFIER, openCollectionFromDialog, openRequest, selectRequestPaneTab } from '../utils/page';
 
 const pane = (page: Page) => buildCommonLocators(page).request.pane();
 const url = (path: string) => `http://link-aware.test/${path}`;
@@ -18,26 +18,18 @@ test.describe('CodeMirror link-aware - WebSocket request tab', () => {
     await expectNoLink(page.locator('.input-container .CodeMirror').first());
   });
 
-  test('Messages: plain click opens a transient WS request', async ({ page }) => {
+  test('Messages: URL is plain text (not a link)', async ({ page }) => {
     await selectRequestPaneTab(page, 'Message');
     const cm = buildCommonLocators(page).codeMirror.within(pane(page));
-    await expectLinkOpensRequest(page, cm, { type: 'ws', url: url('ws-body') });
+    await expectNoLinkMark(cm);
   });
 
-  test('Docs (Markdown mode): plain click opens a transient WS request', async ({ page }) => {
+  test('Docs (Markdown mode): URL is plain text (not a link)', async ({ page }) => {
     await selectRequestPaneTab(page, 'Docs');
     const locators = buildCommonLocators(page);
     await locators.docs.editToggle().click();
     await locators.docs.modeSwitchMarkdown().click();
-    await expectLinkOpensRequest(page, locators.codeMirror.within(pane(page)), { type: 'ws', url: url('ws-docs') });
-  });
-
-  test('Docs (Markdown mode): Cmd/Ctrl+Click opens the link externally', async ({ page }) => {
-    await selectRequestPaneTab(page, 'Docs');
-    const locators = buildCommonLocators(page);
-    await locators.docs.editToggle().click();
-    await locators.docs.modeSwitchMarkdown().click();
-    await expectLinkOpensExternally(page, locators.codeMirror.within(pane(page)));
+    await expectNoLinkMark(locators.codeMirror.within(pane(page)));
   });
 
   test('Docs (Rich Text mode): plain click opens a transient WS request', async ({ page }) => {

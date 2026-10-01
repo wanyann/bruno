@@ -10,12 +10,14 @@ import {
 } from '@tabler/icons';
 import {
   findParentItemInCollection,
+  findItemInCollectionByPathname,
   getDefaultRequestPaneTab,
   flattenItems
 } from 'utils/collections';
 import { addTab, focusTab, isRequestTabType } from 'providers/ReduxStore/slices/tabs';
 import { toggleCollectionItem, toggleCollection } from 'providers/ReduxStore/slices/collections';
 import { mountCollection } from 'providers/ReduxStore/slices/collections/actions';
+import store from 'providers/ReduxStore';
 import { normalizePath } from 'utils/common/path';
 import { normalizeQuery, isValidQuery, highlightText, sortResults, getTypeLabel } from './utils/searchUtils';
 import { SEARCH_TYPES, MATCH_TYPES, SEARCH_CONFIG, DOCUMENTATION_RESULT } from './constants';
@@ -28,6 +30,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
   const [searchIndexVersion, setSearchIndexVersion] = useState(0);
   const [isIndexLoading, setIsIndexLoading] = useState(false);
   const [unresolvedRecentCount, setUnresolvedRecentCount] = useState(0);
+  const [expectedRecentCount, setExpectedRecentCount] = useState(0);
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
   const debounceTimeoutRef = useRef(null);
@@ -190,6 +193,10 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     // request's file path as its uid; treat those as a path lookup too.
     const results = [];
     let unresolvedCount = 0;
+    // Number of recent entries that will be listed (pass the skip filters),
+    // independent of whether their index entry has resolved yet. Used so the
+    // loading skeletons match the final row count exactly.
+    let expectedCount = 0;
     for (const recent of recentRequests) {
       if (!recent || !recent.uid || recent.uid === activeTabUid) continue;
       const recentPath = recent.pathname || (typeof recent.uid === 'string' && recent.uid.includes('/') ? recent.uid : null);
@@ -199,16 +206,17 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
       // only — an example tab shares the parent request's pathname but is a
       // different tab and must not hide the request).
       if (activeRequestPath && normalizedRecentPath === activeRequestPath) continue;
+      if (expectedCount >= 8) break;
+      expectedCount += 1;
       const result = resolveEntry(recent, recentPath);
       if (!result) {
         unresolvedCount += 1;
       } else {
         results.push(result);
       }
-      if (results.length + unresolvedCount >= 8) break;
     }
 
-    return { results, unresolvedCount };
+    return { results, unresolvedCount, expectedCount };
   };
 
   const searchInCollections = (searchTerms, enablePathMatch) => {
@@ -267,13 +275,15 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     const normalizedQuery = normalizeQuery(searchQuery);
 
     if (!normalizedQuery) {
-      const { results: recentResults, unresolvedCount } = createRecentTabsResults();
+      const { results: recentResults, unresolvedCount, expectedCount } = createRecentTabsResults();
       setResults(recentResults);
       setUnresolvedRecentCount(unresolvedCount);
+      setExpectedRecentCount(expectedCount);
       return;
     }
 
     setUnresolvedRecentCount(0);
+    setExpectedRecentCount(0);
 
     if (!isValidQuery(normalizedQuery)) {
       setResults([]);
@@ -306,18 +316,20 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     }, SEARCH_CONFIG.DEBOUNCE_DELAY);
   }, [collections, searchIndexVersion, reduxRequestLookup]); // Refresh when the disk index (re)loads or collections finish mounting
 
-  const expandItemPath = (result) => {
-    const collection = collections.find((c) => c.uid === result.collectionUid);
+  // Expands the collection and every ancestor folder of the result so it is
+  // visible in the sidebar. Must be called after the collection is mounted, as
+  // its item tree arrives asynchronously with the mount.
+  const expandItemPath = (collectionUid, result) => {
+    const state = store.getState();
+    const collection = state.collections.collections.find((c) => c.uid === collectionUid);
     if (!collection) return;
-
-    ensureCollectionIsMounted(collection);
 
     if (collection.collapsed) {
       dispatch(toggleCollection(collection.uid));
     }
 
     let currentItem = result.type === SEARCH_TYPES.FOLDER
-      ? result.item
+      ? findItemInCollectionByPathname(collection, result.item.pathname)
       : findParentItemInCollection(collection, result.item.uid);
 
     while (currentItem?.type === 'folder') {
@@ -328,13 +340,50 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     }
   };
 
+  // Poll until the collection's item tree contains the target pathname (the
+  // tree is populated asynchronously right after mounting), then expand the
+  // ancestor folders. Best-effort: if it never loads, we just skip expanding.
+  const revealResultInSidebar = async (collectionUid, result, attempts = 12) => {
+    const targetPathname = result.item.pathname;
+    for (let i = 0; i < attempts; i += 1) {
+      const state = store.getState();
+      const collection = state.collections.collections.find((c) => c.uid === collectionUid);
+      const item = collection?.pathname && targetPathname
+        ? findItemInCollectionByPathname(collection, targetPathname)
+        : null;
+      // For a folder result, findItemInCollectionByPathname also matches folders.
+      if (item || (result.type === SEARCH_TYPES.FOLDER && collection?.items?.length)) {
+        expandItemPath(collectionUid, result);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  };
+
+  // Mount the target collection and resolve once it is mounted. Concurrent
+  // callers (e.g. repeated Enter while mounting) share the same in-flight
+  // promise so the collection is never mounted twice.
+  const mountPromisesRef = useRef(new Map());
   const ensureCollectionIsMounted = (collection) => {
-    if (!collection || collection.mountStatus === 'mounted') return;
-    dispatch(mountCollection({
-      collectionUid: collection.uid,
-      collectionPathname: collection.pathname,
-      brunoConfig: collection.brunoConfig
-    }));
+    if (!collection || collection.mountStatus === 'mounted') {
+      return Promise.resolve();
+    }
+
+    const inFlight = mountPromisesRef.current.get(collection.uid);
+    if (inFlight) return inFlight;
+
+    const promise = Promise.resolve(
+      dispatch(mountCollection({
+        collectionUid: collection.uid,
+        collectionPathname: collection.pathname,
+        brunoConfig: collection.brunoConfig
+      }))
+    ).finally(() => {
+      mountPromisesRef.current.delete(collection.uid);
+    });
+
+    mountPromisesRef.current.set(collection.uid, promise);
+    return promise;
   };
 
   const handleKeyNavigation = (e) => {
@@ -350,7 +399,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
       Enter: () => {
         e.preventDefault();
         if (results[selectedIndex]) {
-          handleResultSelection(results[selectedIndex]);
+          void handleResultSelection(results[selectedIndex]);
         }
       },
       Escape: () => {
@@ -379,25 +428,32 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
     if (handler) handler();
   };
 
-  const handleResultSelection = (result) => {
-    const targetCollection = collections.find((c) => c.uid === result.collectionUid);
-    ensureCollectionIsMounted(targetCollection);
-
+  const handleResultSelection = async (result) => {
     if (result.type === SEARCH_TYPES.DOCUMENTATION) {
       window.open('https://docs.usebruno.com/', '_blank');
       onClose();
       return;
     }
 
+    const targetCollection = collections.find((c) => c.uid === result.collectionUid);
+
+    // Wait for the collection to mount before opening the tab. Mounting
+    // restores the collection's persisted tabs (restoreTabs), which otherwise
+    // would land after — and clobber — the tab we just opened, switching the
+    // active tab to the first persisted one (e.g. a folder-settings tab).
+    await ensureCollectionIsMounted(targetCollection);
+
     if (result.type === SEARCH_TYPES.REQUEST || result.type === SEARCH_TYPES.FOLDER) {
-      expandItemPath(result);
+      // Reveal in the sidebar once the item tree has loaded.
+      revealResultInSidebar(result.collectionUid, result);
     }
 
     if (result.type === SEARCH_TYPES.REQUEST) {
-      const existingTab = tabs.find((tab) => tab.uid === result.item.uid);
+      const state = store.getState();
+      const existingTab = state.tabs.tabs.find((tab) => tab.uid === result.item.uid);
 
       if (existingTab) {
-        dispatch(focusTab({ uid: result.item.uid }));
+        dispatch(focusTab({ uid: existingTab.uid }));
       } else {
         dispatch(addTab({
           uid: result.item.uid,
@@ -455,6 +511,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
       setResults([]);
       setSelectedIndex(0);
       setUnresolvedRecentCount(0);
+      setExpectedRecentCount(0);
 
       // Resolve recent requests synchronously from Redux so the list can show
       // immediately, before the disk index resolves.
@@ -632,7 +689,7 @@ const GlobalSearchModal = ({ isOpen, onClose }) => {
           >
             {!query && isIndexLoading && unresolvedRecentCount > 0 ? (
               <div className="skeleton-list" data-testid="recent-requests-skeleton" aria-hidden="true">
-                {Array.from({ length: Math.min(unresolvedRecentCount, 8) }).map((_, index) => (
+                {Array.from({ length: Math.min(expectedRecentCount || unresolvedRecentCount, 8) }).map((_, index) => (
                   <div className="skeleton-item" key={`skeleton-${index}`}>
                     <div className="skeleton-method" />
                     <div className="skeleton-content">

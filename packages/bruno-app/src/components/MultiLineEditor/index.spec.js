@@ -129,4 +129,30 @@ describe('MultiLineEditor link-aware reconfiguration', () => {
     expect(mockDestroyLinkAware).not.toHaveBeenCalled();
     expect(mockSetupLinkAware).toHaveBeenCalledTimes(1);
   });
+
+  it('does not set up link awareness when disableLinkAware is set', () => {
+    renderEditor({ item: itemA, collection: collectionA, disableLinkAware: true });
+
+    expect(mockSetupLinkAware).not.toHaveBeenCalled();
+  });
+
+  it('tears down link awareness when disableLinkAware becomes true', () => {
+    const { rerender } = renderEditor({ item: itemA, collection: collectionA });
+
+    expect(mockSetupLinkAware).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ThemeProvider theme={theme}>
+        <MultiLineEditor
+          value="http://example.test/foo"
+          item={itemA}
+          collection={collectionA}
+          disableLinkAware
+        />
+      </ThemeProvider>
+    );
+
+    expect(mockDestroyLinkAware).toHaveBeenCalledTimes(1);
+    expect(mockSetupLinkAware).toHaveBeenCalledTimes(1);
+  });
 });

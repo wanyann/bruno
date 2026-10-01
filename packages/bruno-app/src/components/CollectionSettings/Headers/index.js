@@ -89,6 +89,7 @@ const Headers = ({ collection }) => {
           autocomplete={headerAutoCompleteList}
           collection={collection}
           placeholder={!value ? 'Name' : ''}
+          disableLinkAware
         />
       )
     },
@@ -105,6 +106,7 @@ const Headers = ({ collection }) => {
           collection={collection}
           autocomplete={MimeTypes}
           placeholder={!value ? 'Value' : ''}
+          disableLinkAware
         />
       )
     },

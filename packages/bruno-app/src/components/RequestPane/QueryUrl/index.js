@@ -23,7 +23,7 @@ import { isMacOS } from 'utils/common/platform';
 import { hasRequestChanges } from 'utils/collections';
 import StyledWrapper from './StyledWrapper';
 import GenerateCodeItem from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/index';
-import { generateSnippet } from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/utils/snippet-generator';
+import { generateSnippet, buildRequestItemForCodegen } from 'components/Sidebar/Collections/Collection/CollectionItem/GenerateCodeItem/utils/snippet-generator';
 import { getLanguages } from 'utils/codegenerator/targets';
 import ToolHint from 'components/ToolHint';
 import toast from 'react-hot-toast';
@@ -106,7 +106,7 @@ const QueryUrl = ({ item, collection, handleRun }) => {
 
     try {
       const language = getLanguages()[0]; // Shell-curl
-      const snippet = await generateSnippet({ language, item, collection, shouldInterpolate: true });
+      const snippet = await generateSnippet({ language, item: buildRequestItemForCodegen(item, collection), collection, shouldInterpolate: true });
 
       // Prefer the async clipboard API, falling back to a hidden textarea for older Electron.
       if (navigator.clipboard?.writeText) {

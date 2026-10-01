@@ -119,6 +119,7 @@ const FileBody = ({ item, collection }) => {
                         theme={storedTheme}
                         placeholder="Auto"
                         value={param.contentType}
+                        disableLinkAware
                         onChange={(newValue) =>
                           handleParamChange(
                             {
@@ -151,6 +152,7 @@ const FileBody = ({ item, collection }) => {
                         value={param.description || ''}
                         theme={storedTheme}
                         onSave={onSave}
+                        disableLinkAware
                         onChange={(newValue) =>
                           handleParamChange(
                             {

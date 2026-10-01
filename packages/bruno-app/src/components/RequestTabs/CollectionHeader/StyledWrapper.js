@@ -30,24 +30,21 @@ const StyledWrapper = styled.div`
     border: none;
     border-radius: 4px;
     background: transparent;
-    color: ${(props) => props.theme.text};
+    color: ${(props) => props.theme.colors.text.muted};
     cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.15s ease;
+    font-weight: 400;
+    transition: background-color 0.15s ease, color 0.15s ease;
 
     &:hover {
       background: ${(props) => props.theme.sidebar.collection.item.hoverBg};
+      color: ${(props) => props.theme.text};
     }
 
     .switcher-name {
-      max-width: 124px;
-      overflow: hidden;
-      text-overflow: ellipsis;
       white-space: nowrap;
 
       &.scratch-collection {
-        font-weight: 600;
-        font-size: 15px;
+        font-weight: 400;
       }
     }
 
@@ -60,11 +57,46 @@ const StyledWrapper = styled.div`
       min-width: 18px;
       text-align: center;
     }
+  }
 
-    .chevron {
-      opacity: 0.6;
-      flex-shrink: 0;
+  .tab-breadcrumb {
+    white-space: nowrap;
+  }
+
+  .breadcrumb-group {
+    flex-shrink: 0;
+  }
+
+  .breadcrumb-separator {
+    color: ${(props) => props.theme.colors.text.muted};
+    margin: 0;
+    user-select: none;
+  }
+
+  .breadcrumb-folder {
+    border: none;
+    background: transparent;
+    padding: 4px 8px;
+    margin: 0;
+    border-radius: 4px;
+    font: inherit;
+    font-weight: 400;
+    color: ${(props) => props.theme.colors.text.muted};
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover {
+      background: ${(props) => props.theme.sidebar.collection.item.hoverBg};
+      color: ${(props) => props.theme.text};
     }
+  }
+
+  .breadcrumb-tab-name {
+    font-weight: 600;
+    color: rgb(203, 166, 247);
+    white-space: nowrap;
+    padding: 4px 8px;
   }
 
   .workspace-actions-trigger {
@@ -101,8 +133,8 @@ const StyledWrapper = styled.div`
   }
 
   .workspace-name-input {
-    font-size: 14px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 400;
     padding: 2px 6px;
     border: none;
     background: transparent;

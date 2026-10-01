@@ -10,6 +10,10 @@ export const buildCollectionHeaderLocators = (page: Page) => {
     sandboxModeSelector: () => collectionHeader.getByTestId('sandbox-mode-selector'),
     overflowMenu: () => collectionHeader.getByTestId('more-actions'),
     overflowMenuItem: (itemId: string) => page.getByTestId(`more-actions-${itemId}`),
-    envSelectorTrigger: () => collectionHeader.getByTestId('environment-selector-trigger')
+    envSelectorTrigger: () => collectionHeader.getByTestId('environment-selector-trigger'),
+    breadcrumb: () => collectionHeader.getByTestId('tab-breadcrumb'),
+    breadcrumbTabName: () => collectionHeader.getByTestId('tab-breadcrumb-name'),
+    breadcrumbFolders: () => collectionHeader.locator('.breadcrumb-folder'),
+    breadcrumbFolderByName: (name: string) => collectionHeader.locator('.breadcrumb-folder').filter({ hasText: name })
   };
 };

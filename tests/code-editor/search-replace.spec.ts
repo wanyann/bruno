@@ -14,7 +14,10 @@ import {
   scrollCodeEditorToLine,
   focusCodeEditor,
   getCodeEditorScrollTop,
-  appendTextToCodeEditor
+  appendTextToCodeEditor,
+  typeAtCodeEditorCursor,
+  getCodeEditorCursor,
+  getCodeEditorLine
 } from '../utils/page';
 import process from 'node:process';
 
@@ -347,7 +350,7 @@ test.describe.serial('CodeEditor Search/Replace', () => {
     await setCodeEditorContent(page, EDITOR_ID, LARGE_DOC);
   });
 
-  test('match count updates when the document is edited while search is open', async ({ page }) => {
+  test('editing the document does not re-run the search; the next explicit search refreshes the count', async ({ page }) => {
     const loc = buildCommonLocators(page).codeEditorSearch(EDITOR_ID);
     await test.step('Set content to "foo bar baz" and search for "foo"', async () => {
       await openPreRequestScriptEditor(page, EDITOR_ID);
@@ -356,9 +359,17 @@ test.describe.serial('CodeEditor Search/Replace', () => {
       await loc.searchInput().fill('foo');
       await expectMatchCount(page, '1 / 1');
     });
-    await test.step('Append " foo" to the document — match count updates to 2', async () => {
+    await test.step('Append " foo" to the document — the count is left untouched while editing', async () => {
       await appendTextToCodeEditor(page, EDITOR_ID, ' foo');
-      await expectMatchCount(page, '1 / 2');
+      // Search only runs on explicit triggers (search input / Enter / nav), so
+      // the stale count must remain until the next one.
+      await page.waitForTimeout(300);
+      await expect(loc.matchCount()).toHaveText('1 / 1');
+    });
+    await test.step('Enter refreshes matches and shows the new count', async () => {
+      await loc.searchInput().click();
+      await page.keyboard.press('Enter');
+      await expect(loc.matchCount()).toContainText('/ 2', { timeout: 1500 });
     });
     await closeCodeEditorSearchBar(page, EDITOR_ID);
     await setCodeEditorContent(page, EDITOR_ID, LARGE_DOC);
@@ -453,6 +464,35 @@ test.describe.serial('CodeEditor Search/Replace', () => {
       await expect(loc.searchInput()).toHaveValue('foo');
       await expectMatchCount(page, '3 / 3');
       await expect(loc.replaceInput()).toBeFocused();
+    });
+    await closeCodeEditorSearchBar(page, EDITOR_ID);
+    await setCodeEditorContent(page, EDITOR_ID, LARGE_DOC);
+  });
+
+  test('editing the document keeps the caret in place instead of jumping to the match', async ({ page }) => {
+    const loc = buildCommonLocators(page).codeEditorSearch(EDITOR_ID);
+    await test.step('Search for "Lorem" and note the first match is far from our edit target', async () => {
+      await openPreRequestScriptEditor(page, EDITOR_ID);
+      await setCodeEditorContent(page, EDITOR_ID, 'alpha\nbravo\ncharlie\ndelta\nLorem ipsum');
+      await openCodeEditorSearchBar(page, EDITOR_ID);
+      await loc.searchInput().fill('Lorem');
+      await expectMatchCount(page, '1 / 1');
+    });
+    await test.step('Click the editor on line 1 and type — text must land at the caret, not the match', async () => {
+      await typeAtCodeEditorCursor(page, EDITOR_ID, { line: 1, ch: 0 }, 'XX');
+      // The typed text prepended the clicked line...
+      await expect.poll(() => getCodeEditorLine(page, EDITOR_ID, 1)).toBe('XXbravo');
+      // ...and the caret stayed right after it (not yanked to the Lorem match on line 4).
+      const cursor = await getCodeEditorCursor(page, EDITOR_ID);
+      expect(cursor).toEqual({ line: 1, ch: 2 });
+      // The Lorem line is untouched.
+      await expect.poll(() => getCodeEditorLine(page, EDITOR_ID, 4)).toBe('Lorem ipsum');
+    });
+    await test.step('Enter in the search field still navigates to the match', async () => {
+      await loc.searchInput().click();
+      await page.keyboard.press('Enter');
+      await expectMatchCount(page, '1 / 1');
+      await expect.poll(() => getCodeEditorCursor(page, EDITOR_ID)).toEqual({ line: 4, ch: 5 });
     });
     await closeCodeEditorSearchBar(page, EDITOR_ID);
     await setCodeEditorContent(page, EDITOR_ID, LARGE_DOC);

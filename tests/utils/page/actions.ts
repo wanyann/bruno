@@ -2810,6 +2810,16 @@ const expectNoLink = async (cm: Locator) => {
 };
 
 /**
+ * Assert that a CodeMirror editor does not mark any URL as a link at all
+ * (i.e. URLs are plain text and never clickable).
+ * @param cm - The CodeMirror locator
+ * @returns void
+ */
+const expectNoLinkMark = async (cm: Locator) => {
+  await expect(cm.locator('.CodeMirror-link')).toHaveCount(0);
+};
+
+/**
  * Open a request inside a folder by exact request name.
  * @param page - The page object
  * @param folderName - The name of the folder containing the request
@@ -3733,6 +3743,7 @@ export {
   expectRichTextLinkOpensRequest,
   expectRichTextLinkOpensExternally,
   expectNoLink,
+  expectNoLinkMark,
   LINK_AWARE_COLLECTION_NAME,
   LINK_CLICK_MODIFIER,
   openRequestInFolder,

@@ -175,6 +175,7 @@ const EnvVarValueCell = ({
             collection={collection}
             name={`${actualIndex}.value`}
             value={valueToString(variable.value, 2)}
+            disableLinkAware
             placeholder={variable.value == null || (typeof variable.value === 'string' && variable.value.trim() === '') ? 'Value' : ''}
             isSecret={showAsSecret}
             hideSecretEye={showAsSecret}
@@ -1163,6 +1164,7 @@ const EnvironmentVariablesTable = ({
                       }
                     }}
                     onSave={handleSave}
+                    disableLinkAware
                   />
                 </td>
                 <td>

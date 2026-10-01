@@ -1,5 +1,5 @@
 import { expect, Page, test } from '../../playwright';
-import { buildCommonLocators, buildGrpcCommonLocators, closeAllCollections, LINK_AWARE_COLLECTION_NAME as COLLECTION_NAME, expectLinkOpensExternally, expectLinkOpensRequest, expectRichTextLinkOpensExternally, expectRichTextLinkOpensRequest, LINK_CLICK_MODIFIER, openCollectionFromDialog, openRequest, selectRequestPaneTab } from '../utils/page';
+import { buildCommonLocators, buildGrpcCommonLocators, closeAllCollections, LINK_AWARE_COLLECTION_NAME as COLLECTION_NAME, expectLinkOpensExternally, expectNoLinkMark, expectRichTextLinkOpensExternally, expectRichTextLinkOpensRequest, LINK_CLICK_MODIFIER, openCollectionFromDialog, openRequest, selectRequestPaneTab } from '../utils/page';
 
 const pane = (page: Page) => buildCommonLocators(page).request.pane();
 const url = (path: string) => `http://link-aware.test/${path}`;
@@ -25,26 +25,18 @@ test.describe('CodeMirror link-aware - gRPC request tab', () => {
     await expectLinkOpensExternally(page, cm);
   });
 
-  test('Body / Messages: plain click opens a transient gRPC request', async ({ page }) => {
+  test('Body / Messages: URL is plain text (not a link)', async ({ page }) => {
     await selectRequestPaneTab(page, 'Message');
     const cm = buildGrpcCommonLocators(page).request.messagesContainer().locator('.CodeMirror').first();
-    await expectLinkOpensRequest(page, cm, { type: 'grpc', url: url('grpc-body') });
+    await expectNoLinkMark(cm);
   });
 
-  test('Docs (Markdown mode): plain click opens a transient gRPC request', async ({ page }) => {
+  test('Docs (Markdown mode): URL is plain text (not a link)', async ({ page }) => {
     await selectRequestPaneTab(page, 'Docs');
     const locators = buildCommonLocators(page);
     await locators.docs.editToggle().click();
     await locators.docs.modeSwitchMarkdown().click();
-    await expectLinkOpensRequest(page, locators.codeMirror.within(pane(page)), { type: 'grpc', url: url('grpc-docs') });
-  });
-
-  test('Docs (Markdown mode): Cmd/Ctrl+Click opens the link externally', async ({ page }) => {
-    await selectRequestPaneTab(page, 'Docs');
-    const locators = buildCommonLocators(page);
-    await locators.docs.editToggle().click();
-    await locators.docs.modeSwitchMarkdown().click();
-    await expectLinkOpensExternally(page, locators.codeMirror.within(pane(page)));
+    await expectNoLinkMark(locators.codeMirror.within(pane(page)));
   });
 
   test('Docs (Rich Text mode): plain click opens a transient gRPC request', async ({ page }) => {

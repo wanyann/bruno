@@ -1,6 +1,8 @@
 const { ipcRenderer, contextBridge, webUtils, shell } = require('electron');
 
-contextBridge.exposeInMainWorld('isPlaywright', process.env.PLAYWRIGHT === 'true');
+const isPlaywright = process.env.PLAYWRIGHT === 'true';
+
+contextBridge.exposeInMainWorld('isPlaywright', isPlaywright);
 
 contextBridge.exposeInMainWorld('ipcRenderer', {
   invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args),
@@ -22,5 +24,13 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const path = webUtils.getPathForFile(file);
     return path;
   },
-  openExternal: (url) => shell.openExternal(url)
+  // During automated Playwright runs, opening a URL externally would launch the
+  // user's real browser. Swallow it so tests that exercise "open externally"
+  // behaviour don't leave stray browser tabs behind.
+  openExternal: (url) => {
+    if (isPlaywright) {
+      return Promise.resolve();
+    }
+    return shell.openExternal(url);
+  }
 });

@@ -1,11 +1,11 @@
 import { expect, Page, test } from '../../playwright';
-import { buildCommonLocators, closeAllCollections, LINK_AWARE_COLLECTION_NAME as COLLECTION_NAME, expectLinkOpensExternally, expectLinkOpensRequest, expectRichTextLinkOpensExternally, expectRichTextLinkOpensRequest, LINK_CLICK_MODIFIER, openCollectionFromDialog, openRequest, selectRequestPaneTab, selectScriptSubTab } from '../utils/page';
+import { buildCommonLocators, closeAllCollections, LINK_AWARE_COLLECTION_NAME as COLLECTION_NAME, expectLinkOpensExternally, expectLinkOpensRequest, expectNoLinkMark, expectRichTextLinkOpensExternally, expectRichTextLinkOpensRequest, LINK_CLICK_MODIFIER, openCollectionFromDialog, openRequest, selectRequestPaneTab, selectScriptSubTab } from '../utils/page';
 
 const pane = (page: Page) => buildCommonLocators(page).request.pane();
 const url = (path: string) => `http://link-aware.test/${path}`;
 
 const openVariablesPanel = async (page: Page) => {
-  await page.getByText('Variables', { exact: true }).click();
+  await buildCommonLocators(page).request.pane().getByRole('button', { name: 'Variables' }).click();
 };
 
 test.describe('CodeMirror link-aware - GraphQL request tab', () => {
@@ -35,50 +35,42 @@ test.describe('CodeMirror link-aware - GraphQL request tab', () => {
     await expectLinkOpensRequest(page, cm, { type: 'graphql', url: url('graphql-query') });
   });
 
-  test('Variables: plain click opens a transient GraphQL request', async ({ page }) => {
+  test('Variables: URL is plain text (not a link)', async ({ page }) => {
     await openVariablesPanel(page);
     const cm = pane(page).locator('.CodeMirror').last();
-    await expectLinkOpensRequest(page, cm, { type: 'graphql', url: url('graphql-variables') });
+    await expectNoLinkMark(cm);
   });
 
-  test('Vars: plain click opens a transient GraphQL request', async ({ page }) => {
+  test('Vars: URL is plain text (not a link)', async ({ page }) => {
     await selectRequestPaneTab(page, 'Vars');
     const cm = buildCommonLocators(page).codeMirror.valueCellAt(pane(page));
-    await expectLinkOpensRequest(page, cm, { type: 'graphql', url: url('graphql-vars') });
+    await expectNoLinkMark(cm);
   });
 
-  test('Pre-Request-Script: plain click opens a transient GraphQL request', async ({ page }) => {
+  test('Pre-Request-Script: URL is plain text (not a link)', async ({ page }) => {
     await selectScriptSubTab(page, 'pre-request');
     const cm = buildCommonLocators(page).codeMirror.byTestId('pre-request-script-editor');
-    await expectLinkOpensRequest(page, cm, { type: 'graphql', url: url('graphql-script') });
+    await expectNoLinkMark(cm);
   });
 
-  test('Post-Response-Script: plain click opens a transient GraphQL request', async ({ page }) => {
+  test('Post-Response-Script: URL is plain text (not a link)', async ({ page }) => {
     await selectScriptSubTab(page, 'post-response');
     const cm = buildCommonLocators(page).codeMirror.byTestId('post-response-script-editor');
-    await expectLinkOpensRequest(page, cm, { type: 'graphql', url: url('graphql-script') });
+    await expectNoLinkMark(cm);
   });
 
-  test('Tests: plain click opens a transient GraphQL request', async ({ page }) => {
+  test('Tests: URL is plain text (not a link)', async ({ page }) => {
     await selectRequestPaneTab(page, 'Tests');
     const cm = buildCommonLocators(page).codeMirror.byTestId('test-script-editor');
-    await expectLinkOpensRequest(page, cm, { type: 'graphql', url: url('graphql-tests') });
+    await expectNoLinkMark(cm);
   });
 
-  test('Docs (Markdown mode): plain click opens a transient GraphQL request', async ({ page }) => {
+  test('Docs (Markdown mode): URL is plain text (not a link)', async ({ page }) => {
     await selectRequestPaneTab(page, 'Docs');
     const locators = buildCommonLocators(page);
     await locators.docs.editToggle().click();
     await locators.docs.modeSwitchMarkdown().click();
-    await expectLinkOpensRequest(page, locators.codeMirror.within(pane(page)), { type: 'graphql', url: url('graphql-docs') });
-  });
-
-  test('Docs (Markdown mode): Cmd/Ctrl+Click opens the link externally', async ({ page }) => {
-    await selectRequestPaneTab(page, 'Docs');
-    const locators = buildCommonLocators(page);
-    await locators.docs.editToggle().click();
-    await locators.docs.modeSwitchMarkdown().click();
-    await expectLinkOpensExternally(page, locators.codeMirror.within(pane(page)));
+    await expectNoLinkMark(locators.codeMirror.within(pane(page)));
   });
 
   test('Docs (Rich Text mode): plain click opens a transient GraphQL request', async ({ page }) => {

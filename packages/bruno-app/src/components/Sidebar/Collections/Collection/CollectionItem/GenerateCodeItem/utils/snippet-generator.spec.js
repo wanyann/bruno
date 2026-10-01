@@ -47,7 +47,7 @@ jest.mock('utils/collections/index', () => {
   };
 });
 
-import { generateSnippet } from './snippet-generator';
+import { generateSnippet, buildRequestItemForCodegen } from './snippet-generator';
 
 describe('Snippet Generator - Simple Tests', () => {
   // Simple test request - easy to understand
@@ -1717,6 +1717,51 @@ describe('generateSnippet – URL templates survive real httpsnippet targets', (
       expect(result).toContain('hooks.example.com');
       expect(result).toContain('/services/T00/B00/SECRET/data');
       expect(result).not.toContain('{{webhookUrl}}');
+    });
+  });
+
+  describe('buildRequestItemForCodegen (unsaved/draft request)', () => {
+    const language = { target: 'shell', client: 'curl' };
+    const baseCollection = { root: { request: { auth: { mode: 'none' }, headers: [] } } };
+
+    // An unsaved request keeps the live URL only in `draft.request`; `request.url` is empty.
+    const draftOnlyItem = {
+      uid: 'draft-req',
+      request: {
+        method: 'POST',
+        url: '',
+        headers: [],
+        body: { mode: 'none' },
+        auth: { mode: 'none' }
+      },
+      draft: {
+        request: {
+          method: 'POST',
+          url: 'https://api.example.com/unsaved',
+          headers: [],
+          body: { mode: 'none' },
+          auth: { mode: 'none' }
+        }
+      }
+    };
+
+    it('produces a real curl (not the error sentinel) for a draft-only request', async () => {
+      const item = buildRequestItemForCodegen(draftOnlyItem, baseCollection);
+      const result = await generateSnippet({ language, item, collection: baseCollection, shouldInterpolate: true });
+
+      expect(result).not.toBe('Error generating code snippet');
+      expect(result).toContain('https://api.example.com/unsaved');
+    });
+
+    it('prefers draft.request over request when both exist', () => {
+      const item = buildRequestItemForCodegen(draftOnlyItem, baseCollection);
+      expect(item.request.url).toBe('https://api.example.com/unsaved');
+    });
+
+    it('falls back to request when no draft is present', () => {
+      const saved = { ...draftOnlyItem, draft: undefined, request: { ...draftOnlyItem.request, url: 'https://api.example.com/saved' } };
+      const item = buildRequestItemForCodegen(saved, baseCollection);
+      expect(item.request.url).toBe('https://api.example.com/saved');
     });
   });
 });

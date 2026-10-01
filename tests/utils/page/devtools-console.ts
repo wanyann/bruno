@@ -22,6 +22,7 @@ export const buildDevToolsLocators = (page: Page) => {
   return {
     trigger: () => page.locator('button[data-trigger="dev-tools"]'),
     header: () => page.getByTestId('console-header'),
+    consoleTab: () => page.getByTestId('console-tab'),
     networkTab: () => page.getByTestId('network-tab'),
     networkRows: () => page.getByTestId('network-request-row'),
     closeButton: () => page.getByTitle('Close console'),
